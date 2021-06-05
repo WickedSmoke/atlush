@@ -9,7 +9,6 @@
 
 #include <QMainWindow>
 #include <QGraphicsView>
-#include "Atlush.h"
 
 
 class AWindow : public QMainWindow
@@ -19,7 +18,6 @@ class AWindow : public QMainWindow
 public:
 
     AWindow();
-    ~AWindow();
 
 public slots:
 
@@ -36,29 +34,31 @@ private slots:
     void save();
     void saveAs();
     void addImage();
+    void newProject();
 
 private:
 
     void createActions();
     void createMenus();
     void createTools();
-    void clearProject();
-    IAGroup* addGroup(const QString& name, int x, int y, int w, int h);
+    bool loadProject(const QString& path);
+    bool saveProject(const QString& path);
 
+    QAction* _actNew;
     QAction* _actOpen;
     QAction* _actSave;
+    QAction* _actSaveAs;
     QAction* _actQuit;
     QAction* _actAbout;
     QAction* _actAddImage;
 
     QToolBar* _tools;
 
-    QGraphicsScene* _scene;
+    QGraphicsScene* _scene;     // Stores our project.
     QGraphicsView* _view;
 
     QString _prevProjPath;
     QString _prevImagePath;
-    std::vector<IAGroup*> _groups;
 
     // Disabled copy constructor and operator=
     AWindow( const AWindow & ) : QMainWindow( 0 ) {}
