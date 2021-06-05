@@ -171,8 +171,24 @@ void AWindow::closeEvent( QCloseEvent* ev )
 
 void AWindow::showAbout()
 {
-    QMessageBox::information( this, "About " APP_NAME,
-        "Version " APP_VERSION "\n\nCopyright (c) 2021 Karl Robillard" );
+    QString str(
+        "<h2>" APP_NAME " " APP_VERSION "</h2>\n"
+        "%1, &copy; 2021 Karl Robillard\n"
+        "<h4>Key Commands</h4>\n"
+        "<table>\n"
+        "<tr><td width=\"64\">Del</td><td>Delete item</td>"
+        "<tr><td>Home</td> <td>Reset view</td>"
+        "<tr><td>=</td> <td>Zoom in</td>"
+        "<tr><td>-</td> <td>Zoom out</td>"
+        "</table>\n"
+    );
+
+    QMessageBox* about = new QMessageBox(this);
+    about->setWindowTitle( "About " APP_NAME );
+    about->setIconPixmap( QPixmap(":/icons/logo.png") );
+    about->setTextFormat( Qt::RichText );
+    about->setText( str.arg( __DATE__ ) );
+    about->show();
 }
 
 
@@ -408,7 +424,7 @@ bool AWindow::loadProject(const QString& path)
                 QString fn(buf);
                 QPixmap pix(fn);
                 if (pix.isNull())
-                    pix = QPixmap("icons/missing.png");
+                    pix = QPixmap(":/icons/missing.png");
 
                 pitem = makeImage(pix, x, y);
                 pitem->setData(ID_NAME, fn);
