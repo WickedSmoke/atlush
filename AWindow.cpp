@@ -38,9 +38,17 @@ static void itemValues(ItemValues& iv, const QGraphicsItem* item)
     iv.y = (int) pos.y();
 
     QRectF rect = item->boundingRect();
-    iv.w = (int) rect.width();
-    iv.h = (int) rect.height();
+    iv.w = int(rect.width());
+    iv.h = int(rect.height());
+
+    if (item->type() == QGraphicsPixmapItem::Type) {
+        // boundingRect grows by 1 pixel when ItemIsSelectable is used!
+        iv.w -= 1;
+        iv.h -= 1;
+    }
 }
+
+typedef QList<QGraphicsItem*> ItemList;
 
 #define each_item(pi) \
     for(const QGraphicsItem* pi : _scene->items(Qt::AscendingOrder))
@@ -120,7 +128,11 @@ void AWindow::createActions()
 
     _actAddImage = new QAction(QIcon(":/icons/image-add.png"),
                                "Add Image", this);
-    connect( _actAddImage, SIGNAL(triggered()), this, SLOT(addImage()));
+    connect(_actAddImage, SIGNAL(triggered()), this, SLOT(addImage()));
+
+    _actAddRegion = new QAction(QIcon(":/icons/region-add.png"),
+                                "Add Region", this);
+    connect(_actAddRegion, SIGNAL(triggered()), this, SLOT(addRegion()));
 }
 
 
@@ -151,6 +163,7 @@ void AWindow::createTools()
     _tools->addAction(_actOpen);
     _tools->addAction(_actSave);
     _tools->addAction(_actAddImage);
+    _tools->addAction(_actAddRegion);
 }
 
 
@@ -229,17 +242,23 @@ void AWindow::addImage()
     QString fn;
     QString path(_prevImagePath);
 
-    fn = QFileDialog::getOpenFileName(this, "Open File", path);
+    fn = QFileDialog::getOpenFileName(this, "Add Image", path);
     if( ! fn.isEmpty() ) {
         _prevImagePath = fn;
 
         QPixmap pix(fn);
         if (! pix.isNull()) {
-            QGraphicsPixmapItem* item = _scene->addPixmap(pix);
-            item->setFlags(QGraphicsItem::ItemIsMovable);
+            QGraphicsItem* item = makeImage(pix, 0, 0);
             item->setData(ID_NAME, fn);
         }
     }
+}
+
+void AWindow::addRegion()
+{
+    ItemList sel = _scene->selectedItems();
+    if (! sel.empty() && sel[0]->type() == QGraphicsPixmapItem::Type)
+        makeRegion(sel[0], 0, 0, 32, 32);
 }
 
 //----------------------------------------------------------------------------
@@ -248,6 +267,36 @@ void AWindow::addImage()
 void AWindow::newProject()
 {
     _scene->clear();
+}
+
+QGraphicsPixmapItem* AWindow::makeImage(const QPixmap& pix, int x, int y)
+{
+    QGraphicsPixmapItem* item = _scene->addPixmap(pix);
+    item->setFlags(QGraphicsItem::ItemIsMovable |
+                   QGraphicsItem::ItemIsSelectable);
+    item->setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
+    item->setPos(x, y);
+    return item;
+}
+
+QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
+                                       int w, int h)
+{
+    QRectF rect(0.0, 0.0, w, h);
+    QGraphicsRectItem* item = new QGraphicsRectItem(rect, parent);
+
+    item->setPen(QPen(Qt::NoPen));
+    item->setBrush(QColor(255, 20, 20));
+    item->setOpacity(0.5);
+    item->setFlags(QGraphicsItem::ItemIsMovable |
+                   QGraphicsItem::ItemIsSelectable);
+    item->setPos(x, y);
+    item->setData(ID_NAME, QString("<unnamed>"));
+
+    //QPointF p = item->scenePos();
+    //printf("KR region %f,%f\n", p.x(), p.y());
+
+    return item;
 }
 
 /*
@@ -259,27 +308,61 @@ bool AWindow::loadProject(const QString& path)
     if (! fp)
         return false;
 
+    bool done = false;
     {
-    char* name = new char[1000];
+    QGraphicsItem* pitem = NULL;
+    char* buf = new char[1000];
     int x, y, w, h;
-    while (fscanf(fp, "\"%999[^\"]\" %d,%d,%d,%d\n", name, &x,&y,&w,&h) == 5) {
-        //printf("KR %s %d,%d,%d,%d\n", name, x, y, w, h);
+    int nested = 0;
 
-        QString fn(name);
-        QPixmap pix(fn);
-        if (pix.isNull())
-            pix = QPixmap("icons/missing.png");
+    while (fread(buf, 1, 1, fp) == 1) {
+      switch (buf[0]) {
+        case '"':
+            if (fscanf(fp, "%999[^\"]\" %d,%d,%d,%d", buf, &x, &y, &w, &h) != 5)
+                goto fail;
+            //printf("KR %s %d,%d,%d,%d\n", buf, x, y, w, h);
 
-        QGraphicsPixmapItem* item = _scene->addPixmap(pix);
-        item->setFlags(QGraphicsItem::ItemIsMovable);
-        item->setData(ID_NAME, fn);
-        item->setOffset(x, y);
+            if (nested) {
+                if (pitem) {
+                    QPointF pp = pitem->scenePos();
+                    makeRegion(pitem, x - int(pp.x()), y - int(pp.y()), w, h);
+                }
+            } else {
+                QString fn(buf);
+                QPixmap pix(fn);
+                if (pix.isNull())
+                    pix = QPixmap("icons/missing.png");
+
+                pitem = makeImage(pix, x, y);
+                pitem->setData(ID_NAME, fn);
+            }
+            break;
+
+        case '[':
+            ++nested;
+            break;
+
+        case ']':
+            --nested;
+            break;
+
+        case ' ':
+        case '\t':
+        case '\n':
+            break;
+
+        default:
+            goto fail;
+      }
     }
-    delete[] name;
+    done = true;
+
+fail:
+    delete[] buf;
     }
 
     fclose(fp);
-    return true;
+    return done;
 }
 
 static int regionWriteBoron(FILE* fp, const ItemValues& iv) {
@@ -299,13 +382,24 @@ bool AWindow::saveProject(const QString& path)
 
     bool done = false;
     each_item(it) {
+        if (it->type() != QGraphicsPixmapItem::Type)
+            continue;
         itemValues(val, it);
         if (regionWriteBoron(fp, val) < 0)
             goto fail;
-        each_child(it, ch) {
-            itemValues(val, ch);
-            if (regionWriteBoron(fp, val) < 0)
-                goto fail;
+
+        ItemList clist = it->childItems();
+        if (! clist.empty()) {
+            fprintf(fp, "[\n");
+            for(const QGraphicsItem* ch : clist) {
+                if (ch->type() != QGraphicsRectItem::Type)
+                    continue;
+                fprintf(fp, "  ");
+                itemValues(val, ch);
+                if (regionWriteBoron(fp, val) < 0)
+                    goto fail;
+            }
+            fprintf(fp, "]\n");
         }
     }
     done = true;

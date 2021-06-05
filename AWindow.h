@@ -37,6 +37,7 @@ private slots:
     void save();
     void saveAs();
     void addImage();
+    void addRegion();
     void newProject();
 
 private:
@@ -44,6 +45,8 @@ private:
     void createActions();
     void createMenus();
     void createTools();
+    QGraphicsPixmapItem* makeImage(const QPixmap&, int x, int y);
+    QGraphicsRectItem* makeRegion(QGraphicsItem* parent, int, int, int, int);
     bool loadProject(const QString& path);
     bool saveProject(const QString& path);
 
@@ -54,6 +57,7 @@ private:
     QAction* _actQuit;
     QAction* _actAbout;
     QAction* _actAddImage;
+    QAction* _actAddRegion;
 
     QToolBar* _tools;
 
