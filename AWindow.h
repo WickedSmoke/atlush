@@ -51,6 +51,8 @@ private:
     void createActions();
     void createMenus();
     void createTools();
+    void clearProject();
+    IAGroup* addGroup(const QString& name, int x, int y, int w, int h);
 
     QAction* _actOpen;
     QAction* _actSave;

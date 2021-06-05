@@ -17,6 +17,67 @@
 #include "AWindow.h"
 #include "Atlush.h"
 
+#define UTF8(str)   str.toUtf8().constData()
+
+
+static IAGroup* makeGroup(const QString& name, int x, int y, int w, int h)
+{
+    IAGroup* grp = new IAGroup;
+    grp->name = name;
+    grp->setArea(x, y, w, h);
+    return grp;
+}
+
+
+static bool loadProject(const QString& path, std::vector<IAGroup*>& groups)
+{
+    FILE* fp = fopen(UTF8(path), "r");
+    if (! fp)
+        return false;
+
+    {
+    char* name = new char[1000];
+    int x, y, w, h;
+    while (fscanf(fp, "\"%999[^\"]\" %d,%d,%d,%d\n", name, &x, &y, &w, &h) == 5) {
+        //printf("KR %s %d,%d,%d,%d\n", name, x, y, w, h);
+        groups.push_back( makeGroup(QString(name), x, y, w, h) );
+    }
+    delete[] name;
+    }
+
+    fclose(fp);
+    return true;
+}
+
+static int iar_save(FILE* fp, const IARegion* reg) {
+    return fprintf(fp, "\"%s\" %d,%d,%d,%d\n",
+            UTF8(reg->name), reg->x, reg->y, reg->w, reg->h);
+}
+
+static bool saveProject(const QString& path,
+                        const std::vector<IAGroup*>& groups)
+{
+    FILE* fp = fopen(UTF8(path), "w");
+    if (! fp)
+        return false;
+
+    bool done = false;
+    for (auto gr: groups) {
+        if (iar_save(fp, gr) < 0)
+            goto fail;
+        for (auto ch: gr->children) {
+            if (iar_save(fp, &ch) < 0)
+                goto fail;
+        }
+    }
+    done = true;
+
+fail:
+    fclose(fp);
+    return done;
+}
+
+//----------------------------------------------------------------------------
 
 AWindow::AWindow()
 {
@@ -42,8 +103,7 @@ AWindow::AWindow()
 
 AWindow::~AWindow()
 {
-    for (auto it: _groups)
-        delete it;
+    clearProject();
 }
 
 void AWindow::closeEvent( QCloseEvent* ev )
@@ -135,14 +195,33 @@ void AWindow::createTools()
 }
 
 
+void AWindow::clearProject()
+{
+    _scene->clear();
+
+    for (auto it: _groups)
+        delete it;
+    _groups.clear();
+}
+
+
 void AWindow::open( const QString& file )
 {
-    if( 1 )
-    {
-        setWindowTitle( file );
-    }
-    else
-    {
+    clearProject();
+
+    if (loadProject(file, _groups)) {
+        QString title(file);
+        title.append(" - " APP_NAME);
+        setWindowTitle(title);
+
+        for (auto grp: _groups) {
+            QPixmap pix(grp->name);
+            if (pix.isNull())
+                pix = QPixmap("icons/missing.png");
+            QGraphicsPixmapItem* item = _scene->addPixmap(pix);
+            item->setOffset(grp->x, grp->y);
+        }
+    } else {
         QString error( "Error opening file " );
         QMessageBox::warning( this, "Load", error + file );
     }
@@ -152,44 +231,13 @@ void AWindow::open( const QString& file )
 void AWindow::open()
 {
     QString fn;
-    QString path( "" /*lastSampleFileName*/ );
+    QString path(_prevProjPath);
 
-    //if( ! path.isNull() )
-    //    pathTruncate( path );
-
-    fn = QFileDialog::getOpenFileName( this, "Open File", path );
-    if( ! fn.isEmpty() )
+    fn = QFileDialog::getOpenFileName(this, "Open File", path);
+    if (! fn.isEmpty()) {
+        _prevProjPath = fn;
         open( fn );
-}
-
-
-#define UTF8(str)   str.toUtf8().constData()
-
-static int iar_save(FILE* fp, const IARegion* reg) {
-    return fprintf(fp, "\"%s\" %d,%d,%d,%d\n",
-            UTF8(reg->name), reg->x, reg->y, reg->w, reg->h);
-}
-
-static bool saveProject(const QString& path, std::vector<IAGroup*> groups)
-{
-    FILE* fp = fopen(UTF8(path), "w");
-    if (! fp)
-        return false;
-
-    bool done = false;
-    for (auto gr: groups) {
-        if (iar_save(fp, gr) < 0)
-            goto fail;
-        for (auto ch: gr->children) {
-            if (iar_save(fp, &ch) < 0)
-                goto fail;
-        }
     }
-    done = true;
-
-fail:
-    fclose(fp);
-    return done;
 }
 
 
@@ -226,9 +274,7 @@ void AWindow::addImage()
 
         QPixmap pix(fn);
         if (! pix.isNull()) {
-            IAGroup* grp = new IAGroup;
-            grp->name = fn;
-            grp->setArea(0, 0, pix.width(), pix.height());
+            IAGroup* grp = makeGroup(fn, 0, 0, pix.width(), pix.height());
             _groups.push_back(grp);
 
             QGraphicsPixmapItem* item = _scene->addPixmap(pix);
