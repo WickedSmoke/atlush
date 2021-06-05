@@ -1,4 +1,7 @@
 exe %atlush [
     qt [widgets]
-    sources [%AWindow.cpp]
+    sources [
+        %AWindow.cpp
+        %icons.qrc
+    ]
 ]

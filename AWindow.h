@@ -8,6 +8,7 @@
 
 
 #include <QMainWindow>
+#include <QGraphicsView>
 
 
 class AWindow : public QMainWindow
@@ -40,6 +41,7 @@ private slots:
     void open();
     void save();
     void saveAs();
+    void addImage();
 
 private:
 
@@ -51,6 +53,12 @@ private:
     QAction* _actSave;
     QAction* _actQuit;
     QAction* _actAbout;
+    QAction* _actAddImage;
+
+    QToolBar* _tools;
+
+    QGraphicsScene* _scene;
+    QGraphicsView* _view;
 
     // Disabled copy constructor and operator=
     AWindow( const AWindow & ) : QMainWindow( 0 ) {}

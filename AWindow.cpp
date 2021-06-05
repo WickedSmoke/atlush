@@ -11,15 +11,25 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStyle>
+#include <QToolBar>
 #include "AWindow.h"
 #include "Atlush.h"
 
 
 AWindow::AWindow()
 {
+    setWindowTitle(APP_NAME);
+
     createActions();
     createMenus();
     createTools();
+
+    _scene = new QGraphicsScene;
+
+    _view = new QGraphicsView(_scene);
+    _view->setMinimumSize(128, 128);
+    _view->setBackgroundBrush(QBrush(Qt::darkGray));
+    setCentralWidget(_view);
 }
 
 
@@ -69,6 +79,10 @@ void AWindow::createActions()
 
     _actAbout = new QAction( "&About", this );
     connect( _actAbout, SIGNAL(triggered()), this, SLOT(showAbout()));
+
+    _actAddImage = new QAction(QIcon(":/icons/image-add.png"),
+                               "Add Image", this);
+    connect( _actAddImage, SIGNAL(triggered()), this, SLOT(addImage()));
 }
 
 
@@ -91,6 +105,10 @@ void AWindow::createMenus()
 
 void AWindow::createTools()
 {
+    _tools = addToolBar("");
+    _tools->addAction(_actOpen);
+    _tools->addAction(_actSave);
+    _tools->addAction(_actAddImage);
 }
 
 
@@ -131,6 +149,10 @@ void AWindow::saveAs()
 {
 }
 
+
+void AWindow::addImage()
+{
+}
 
 //----------------------------------------------------------------------------
 
