@@ -1,0 +1,2 @@
+#define APP_NAME    "Atlush"
+#define APP_VERSION "0.0.1"
