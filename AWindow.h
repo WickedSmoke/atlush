@@ -9,6 +9,7 @@
 
 #include <QMainWindow>
 #include <QGraphicsView>
+#include "RecentFiles.h"
 
 
 class AWindow : public QMainWindow
@@ -19,9 +20,10 @@ public:
 
     AWindow();
 
+    bool openFile(const QString& file);
+
 public slots:
 
-    void open( const QString& file );
     void showAbout();
 
 protected:
@@ -31,6 +33,7 @@ protected:
 private slots:
 
     void open();
+    void openRecent();
     void save();
     void saveAs();
     void addImage();
@@ -59,6 +62,7 @@ private:
 
     QString _prevProjPath;
     QString _prevImagePath;
+    RecentFiles _recent;
 
     // Disabled copy constructor and operator=
     AWindow( const AWindow & ) : QMainWindow( 0 ) {}

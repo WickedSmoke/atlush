@@ -69,6 +69,7 @@ AWindow::AWindow()
     resize(settings.value("window-size", QSize(480, 480)).toSize());
     _prevProjPath  = settings.value("prev-project").toString();
     _prevImagePath = settings.value("prev-image").toString();
+    _recent.setFiles(settings.value("recent-files").toStringList());
 }
 
 
@@ -78,6 +79,7 @@ void AWindow::closeEvent( QCloseEvent* ev )
     settings.setValue("window-size", size());
     settings.setValue("prev-project", _prevProjPath);
     settings.setValue("prev-image", _prevImagePath);
+    settings.setValue("recent-files", _recent.files);
 
     QMainWindow::closeEvent( ev );
 }
@@ -132,6 +134,8 @@ void AWindow::createMenus()
     file->addAction( _actSave );
     file->addAction( _actSaveAs );
     file->addSeparator();
+    _recent.install(file, this, SLOT(openRecent()));
+    file->addSeparator();
     file->addAction( _actQuit );
 
     bar->addSeparator();
@@ -150,7 +154,7 @@ void AWindow::createTools()
 }
 
 
-void AWindow::open( const QString& file )
+bool AWindow::openFile(const QString& file)
 {
     _scene->clear();
 
@@ -158,9 +162,11 @@ void AWindow::open( const QString& file )
         QString title(file);
         title.append(" - " APP_NAME);
         setWindowTitle(title);
+        return true;
     } else {
         QString error( "Error opening file " );
         QMessageBox::warning( this, "Load", error + file );
+        return false;
     }
 }
 
@@ -173,10 +179,17 @@ void AWindow::open()
     fn = QFileDialog::getOpenFileName(this, "Open File", path);
     if (! fn.isEmpty()) {
         _prevProjPath = fn;
-        open( fn );
+        if (openFile(fn))
+            _recent.addFile(&fn);
     }
 }
 
+void AWindow::openRecent()
+{
+    QString fn = _recent.fileOpened(sender());
+    if (! fn.isEmpty())
+        openFile(fn);
+}
 
 static void saveFailed(QWidget* parent, const QString& fn) {
     QString error( "Error saving project " );
@@ -186,10 +199,14 @@ static void saveFailed(QWidget* parent, const QString& fn) {
 
 void AWindow::save()
 {
-    if (_prevProjPath.isEmpty())
+    if (_prevProjPath.isEmpty()) {
         saveAs();
-    else if (! saveProject(_prevProjPath))
-        saveFailed(this, _prevProjPath);
+    } else {
+        if (saveProject(_prevProjPath))
+            _recent.addFile(&_prevProjPath);
+        else
+            saveFailed(this, _prevProjPath);
+    }
 }
 
 
@@ -309,8 +326,8 @@ int main( int argc, char **argv )
     AWindow w;
     w.show();
 
-    if( argc > 1 )
-        w.open( argv[1] );
+    if (argc > 1)
+        w.openFile(argv[1]);
 
     return app.exec();
 }
