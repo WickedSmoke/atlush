@@ -38,6 +38,7 @@ private slots:
     void saveAs();
     void addImage();
     void addRegion();
+    void removeSelected();
     void newProject();
 
 private:
@@ -58,6 +59,7 @@ private:
     QAction* _actAbout;
     QAction* _actAddImage;
     QAction* _actAddRegion;
+    QAction* _actRemove;
 
     QToolBar* _tools;
 

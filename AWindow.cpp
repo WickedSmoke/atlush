@@ -197,23 +197,23 @@ void AWindow::createActions()
 #define STD_ICON(id)    style()->standardIcon(QStyle::id)
 
     _actNew = new QAction(STD_ICON(SP_FileIcon), "&New Project", this);
-    _actNew->setShortcuts(QKeySequence::New);
+    _actNew->setShortcut(QKeySequence::New);
     connect( _actNew, SIGNAL(triggered()), this, SLOT(newProject()));
 
     _actOpen = new QAction(STD_ICON(SP_DialogOpenButton), "&Open...", this );
-    _actOpen->setShortcuts(QKeySequence::Open);
+    _actOpen->setShortcut(QKeySequence::Open);
     connect( _actOpen, SIGNAL(triggered()), this, SLOT(open()));
 
     _actSave = new QAction(STD_ICON(SP_DialogSaveButton), "&Save", this );
-    _actSave->setShortcuts(QKeySequence::Save);
+    _actSave->setShortcut(QKeySequence::Save);
     connect( _actSave, SIGNAL(triggered()), this, SLOT(save()));
 
     _actSaveAs = new QAction("Save &As...", this);
-    _actSaveAs->setShortcuts(QKeySequence::SaveAs);
+    _actSaveAs->setShortcut(QKeySequence::SaveAs);
     connect( _actSaveAs, SIGNAL(triggered()), this, SLOT(saveAs()));
 
     _actQuit = new QAction( "&Quit", this );
-    _actQuit->setShortcuts(QKeySequence::Quit);
+    _actQuit->setShortcut(QKeySequence::Quit);
     connect( _actQuit, SIGNAL(triggered()), this, SLOT(close()));
 
     _actAbout = new QAction( "&About", this );
@@ -221,11 +221,17 @@ void AWindow::createActions()
 
     _actAddImage = new QAction(QIcon(":/icons/image-add.png"),
                                "Add Image", this);
+    _actAddImage->setShortcut(QKeySequence(Qt::Key_Insert));
     connect(_actAddImage, SIGNAL(triggered()), this, SLOT(addImage()));
 
     _actAddRegion = new QAction(QIcon(":/icons/region-add.png"),
                                 "Add Region", this);
     connect(_actAddRegion, SIGNAL(triggered()), this, SLOT(addRegion()));
+
+    _actRemove = new QAction(QIcon(":/icons/image-remove.png"),
+                                "Remove Item", this);
+    _actRemove->setShortcut(QKeySequence(Qt::Key_Delete));
+    connect(_actRemove, SIGNAL(triggered()), this, SLOT(removeSelected()));
 }
 
 
@@ -243,6 +249,11 @@ void AWindow::createMenus()
     file->addSeparator();
     file->addAction( _actQuit );
 
+    QMenu* edit = bar->addMenu( "&Edit" );
+    edit->addAction( _actAddImage );
+    edit->addAction( _actAddRegion );
+    edit->addAction( _actRemove );
+
     bar->addSeparator();
 
     QMenu* help = bar->addMenu( "&Help" );
@@ -257,6 +268,7 @@ void AWindow::createTools()
     _tools->addAction(_actSave);
     _tools->addAction(_actAddImage);
     _tools->addAction(_actAddRegion);
+    _tools->addAction(_actRemove);
 }
 
 
@@ -350,8 +362,22 @@ void AWindow::addImage()
 void AWindow::addRegion()
 {
     ItemList sel = _scene->selectedItems();
-    if (! sel.empty() && sel[0]->type() == QGraphicsPixmapItem::Type)
-        makeRegion(sel[0], 0, 0, 32, 32);
+    if (! sel.empty()) {
+        QGraphicsItem* item = sel[0];
+        if (item->type() != QGraphicsPixmapItem::Type)
+            item = item->parentItem();
+        if (item)
+            makeRegion(item, 0, 0, 32, 32);
+    }
+}
+
+void AWindow::removeSelected()
+{
+    ItemList sel = _scene->selectedItems();
+    if (! sel.empty()) {
+        _scene->removeItem(sel[0]);
+        delete sel[0];
+    }
 }
 
 //----------------------------------------------------------------------------
