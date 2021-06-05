@@ -9,6 +9,7 @@
 
 #include <QMainWindow>
 #include <QGraphicsView>
+#include "Atlush.h"
 
 
 class AWindow : public QMainWindow
@@ -18,6 +19,7 @@ class AWindow : public QMainWindow
 public:
 
     AWindow();
+    ~AWindow();
 
 public slots:
 
@@ -28,6 +30,7 @@ protected:
 
     virtual void keyPressEvent( QKeyEvent* );
     virtual void mousePressEvent( QMouseEvent* );
+    virtual void closeEvent( QCloseEvent* );
 
     /*
     virtual void mouseReleaseEvent( QMouseEvent* );
@@ -59,6 +62,10 @@ private:
 
     QGraphicsScene* _scene;
     QGraphicsView* _view;
+
+    QString _prevProjPath;
+    QString _prevImagePath;
+    std::vector<IAGroup*> _groups;
 
     // Disabled copy constructor and operator=
     AWindow( const AWindow & ) : QMainWindow( 0 ) {}
