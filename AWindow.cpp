@@ -123,27 +123,6 @@ void AWindow::showAbout()
 }
 
 
-void AWindow::keyPressEvent( QKeyEvent* e )
-{
-    switch( e->key() )
-    {
-        case Qt::Key_Q:
-        case Qt::Key_Escape:
-            close();
-            break;
-
-        default:
-            e->ignore();
-            break;
-    }
-}
-
-
-void AWindow::mousePressEvent( QMouseEvent* )
-{
-}
-
-
 void AWindow::createActions()
 {
 #define STD_ICON(id)    style()->standardIcon(QStyle::id)
@@ -219,6 +198,7 @@ void AWindow::open( const QString& file )
             if (pix.isNull())
                 pix = QPixmap("icons/missing.png");
             QGraphicsPixmapItem* item = _scene->addPixmap(pix);
+            item->setFlags(QGraphicsItem::ItemIsMovable);
             item->setOffset(grp->x, grp->y);
         }
     } else {
@@ -278,6 +258,7 @@ void AWindow::addImage()
             _groups.push_back(grp);
 
             QGraphicsPixmapItem* item = _scene->addPixmap(pix);
+            item->setFlags(QGraphicsItem::ItemIsMovable);
             item->setOffset(grp->x, grp->y);
         }
     }
