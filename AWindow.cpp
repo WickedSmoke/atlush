@@ -11,6 +11,7 @@
 #include <QKeyEvent>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QScrollBar>
 #include <QSettings>
 #include <QStyle>
 #include <QToolBar>
@@ -58,6 +59,82 @@ typedef QList<QGraphicsItem*> ItemList;
 
 //----------------------------------------------------------------------------
 
+class AView : public QGraphicsView
+{
+public:
+    AView(QGraphicsScene* scene) : QGraphicsView(scene)
+    {
+        setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    }
+
+protected:
+    void keyPressEvent(QKeyEvent*);
+    void mousePressEvent(QMouseEvent*);
+    void mouseMoveEvent(QMouseEvent*);
+    void wheelEvent(QWheelEvent*);
+
+private:
+    QPoint _panStart;
+};
+
+void AView::keyPressEvent(QKeyEvent* event)
+{
+    switch (event->key()) {
+        case Qt::Key_Equal:
+            scale(1.44, 1.44);
+            break;
+        case Qt::Key_Minus:
+        {
+            const qreal inv = 1.0 / 1.44;
+            scale(inv, inv);
+        }
+            break;
+        case Qt::Key_Home:
+            resetTransform();
+            break;
+        default:
+            QGraphicsView::keyPressEvent(event);
+            break;
+    }
+}
+
+void AView::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::MiddleButton) {
+        _panStart = event->pos();
+        //setCursor(Qt::ClosedHandCursor);
+        event->accept();
+    } else
+        QGraphicsView::mousePressEvent(event);
+}
+
+void AView::mouseMoveEvent(QMouseEvent* event)
+{
+    if (event->buttons() & Qt::MiddleButton) {
+        QScrollBar* sb;
+
+        sb = horizontalScrollBar();
+        sb->setValue(sb->value() - (event->x() - _panStart.x()));
+        sb = verticalScrollBar();
+        sb->setValue(sb->value() - (event->y() - _panStart.y()));
+        _panStart = event->pos();
+
+        event->accept();
+    } else
+        QGraphicsView::mouseMoveEvent(event);
+}
+
+void AView::wheelEvent(QWheelEvent* event)
+{
+    // Zoom In/Out.
+    qreal sfactor = qreal(event->angleDelta().y()) / 100.0;
+    if (sfactor < 0.0)
+        sfactor = -1.0 / sfactor;
+    scale(sfactor, sfactor);
+}
+
+//----------------------------------------------------------------------------
+
 AWindow::AWindow()
 {
     setWindowTitle(APP_NAME);
@@ -68,7 +145,7 @@ AWindow::AWindow()
 
     _scene = new QGraphicsScene;
 
-    _view = new QGraphicsView(_scene);
+    _view = new AView(_scene);
     _view->setMinimumSize(128, 128);
     _view->setBackgroundBrush(QBrush(Qt::darkGray));
     setCentralWidget(_view);
