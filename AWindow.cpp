@@ -655,12 +655,14 @@ bool AWindow::loadProject(const QString& path)
     int x, y, w, h;
     int nested = 0;
 
+    // Parse Boron string!/coord!/block! values.
     while (fread(buf, 1, 1, fp) == 1) {
       switch (buf[0]) {
         case '"':
             if (fscanf(fp, "%999[^\"]\" %d,%d,%d,%d", buf, &x, &y, &w, &h) != 5)
                 goto fail;
             //printf("KR %s %d,%d,%d,%d\n", buf, x, y, w, h);
+add_item:
         {
             QString name(buf);
             if (nested) {
@@ -688,6 +690,11 @@ bool AWindow::loadProject(const QString& path)
         case ']':
             --nested;
             break;
+
+        case '{':
+            if (fscanf(fp, "%999[^}]} %d,%d,%d,%d", buf, &x, &y, &w, &h) != 5)
+                goto fail;
+            goto add_item;
 
         case ';':
             while ((x = fgetc(fp)) != EOF) {
