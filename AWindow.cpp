@@ -623,6 +623,13 @@ bool AWindow::loadProject(const QString& path)
             --nested;
             break;
 
+        case ';':
+            while ((x = fgetc(fp)) != EOF) {
+                if (x == '\n')
+                    break;
+            }
+            break;
+
         case ' ':
         case '\t':
         case '\n':
