@@ -271,15 +271,21 @@ void AWindow::createTools()
     _tools->addAction(_actRemove);
 }
 
+void AWindow::updateProjectName(const QString& path)
+{
+    _prevProjPath = path;
+
+    QString title(path);
+    title.append(" - " APP_NAME);
+    setWindowTitle(title);
+}
 
 bool AWindow::openFile(const QString& file)
 {
     _scene->clear();
 
     if (loadProject(file)) {
-        QString title(file);
-        title.append(" - " APP_NAME);
-        setWindowTitle(title);
+        updateProjectName(file);
         return true;
     } else {
         QString error( "Error opening file " );
@@ -292,11 +298,9 @@ bool AWindow::openFile(const QString& file)
 void AWindow::open()
 {
     QString fn;
-    QString path(_prevProjPath);
 
-    fn = QFileDialog::getOpenFileName(this, "Open File", path);
+    fn = QFileDialog::getOpenFileName(this, "Open File", _prevProjPath);
     if (! fn.isEmpty()) {
-        _prevProjPath = fn;
         if (openFile(fn))
             _recent.addFile(&fn);
     }
@@ -331,12 +335,13 @@ void AWindow::save()
 void AWindow::saveAs()
 {
     QString fn;
-    QString path(_prevProjPath);
 
-    fn = QFileDialog::getSaveFileName(this, "Save Project As", path);
+    fn = QFileDialog::getSaveFileName(this, "Save Project As", _prevProjPath);
     if (! fn.isEmpty()) {
-        _prevProjPath = fn;
-        if (! saveProject(fn))
+        if (saveProject(fn)) {
+            updateProjectName(fn);
+            _recent.addFile(&fn);
+        } else
             saveFailed(this, fn);
     }
 }
@@ -345,9 +350,8 @@ void AWindow::saveAs()
 void AWindow::addImage()
 {
     QString fn;
-    QString path(_prevImagePath);
 
-    fn = QFileDialog::getOpenFileName(this, "Add Image", path);
+    fn = QFileDialog::getOpenFileName(this, "Add Image", _prevImagePath);
     if( ! fn.isEmpty() ) {
         _prevImagePath = fn;
 
