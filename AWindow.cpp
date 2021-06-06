@@ -72,8 +72,16 @@ public:
         setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     }
 
+    void zoomIn() {
+        scale(1.44, 1.44);
+    }
+
+    void zoomOut() {
+        const qreal inv = 1.0 / 1.44;
+        scale(inv, inv);
+    }
+
 protected:
-    void keyPressEvent(QKeyEvent*);
     void mousePressEvent(QMouseEvent*);
     void mouseMoveEvent(QMouseEvent*);
     void wheelEvent(QWheelEvent*);
@@ -81,27 +89,6 @@ protected:
 private:
     QPoint _panStart;
 };
-
-void AView::keyPressEvent(QKeyEvent* event)
-{
-    switch (event->key()) {
-        case Qt::Key_Equal:
-            scale(1.44, 1.44);
-            break;
-        case Qt::Key_Minus:
-        {
-            const qreal inv = 1.0 / 1.44;
-            scale(inv, inv);
-        }
-            break;
-        case Qt::Key_Home:
-            resetTransform();
-            break;
-        default:
-            QGraphicsView::keyPressEvent(event);
-            break;
-    }
-}
 
 void AView::mousePressEvent(QMouseEvent* event)
 {
@@ -179,21 +166,15 @@ void AWindow::showAbout()
 {
     QString str(
         "<h2>" APP_NAME " " APP_VERSION "</h2>\n"
-        "%1, &copy; 2021 Karl Robillard\n"
-        "<h4>Key Commands</h4>\n"
-        "<table>\n"
-        "<tr><td width=\"64\">Del</td><td>Delete item</td>"
-        "<tr><td>Home</td> <td>Reset view</td>"
-        "<tr><td>=</td> <td>Zoom in</td>"
-        "<tr><td>-</td> <td>Zoom out</td>"
-        "</table>\n"
-    );
+        "<p>Image Atlas Shuffler, &copy; 2021 Karl Robillard</p>\n"
+        "<p>Built on %1</p>\n"
+   );
 
     QMessageBox* about = new QMessageBox(this);
     about->setWindowTitle( "About " APP_NAME );
     about->setIconPixmap( QPixmap(":/icons/logo.png") );
     about->setTextFormat( Qt::RichText );
-    about->setText( str.arg( __DATE__ ) );
+    about->setText( str.arg(__DATE__) );
     about->show();
 }
 
@@ -245,7 +226,27 @@ void AWindow::createActions()
     _actUndo->setShortcut(QKeySequence::Undo);
     _actUndo->setEnabled(false);
     connect(_actUndo, SIGNAL(triggered()), SLOT(undo()));
+
+    _actViewReset = new QAction( "&Reset View", this );
+    _actViewReset->setShortcut(QKeySequence(Qt::Key_Home));
+    connect(_actViewReset, SIGNAL(triggered()), SLOT(viewReset()));
+
+    _actZoomIn = new QAction(QIcon(":/icons/zoom-in.png"),
+                             "Zoom &In", this );
+    _actZoomIn->setShortcut(QKeySequence(Qt::Key_Equal));
+    connect(_actZoomIn, SIGNAL(triggered()), SLOT(viewZoomIn()));
+
+    _actZoomOut = new QAction(QIcon(":/icons/zoom-out.png"),
+                              "Zoom &Out", this );
+    _actZoomOut->setShortcut(QKeySequence(Qt::Key_Minus));
+    connect(_actZoomOut, SIGNAL(triggered()), SLOT(viewZoomOut()));
 }
+
+void AWindow::viewReset() { static_cast<AView*>(_view)->resetTransform(); }
+
+void AWindow::viewZoomIn() { static_cast<AView*>(_view)->zoomIn(); }
+
+void AWindow::viewZoomOut() { static_cast<AView*>(_view)->zoomOut(); }
 
 
 void AWindow::createMenus()
@@ -268,6 +269,11 @@ void AWindow::createMenus()
     edit->addAction( _actRemove );
     edit->addSeparator();
     edit->addAction( _actUndo );
+
+    QMenu* view = bar->addMenu( "&View" );
+    view->addAction( _actViewReset );
+    view->addAction( _actZoomIn );
+    view->addAction( _actZoomOut );
 
     bar->addSeparator();
 

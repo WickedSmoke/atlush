@@ -43,6 +43,9 @@ private slots:
     void addRegion();
     void removeSelected();
     void undo();
+    void viewReset();
+    void viewZoomIn();
+    void viewZoomOut();
     void syncSelection();
     void newProject();
     void modName();
@@ -73,6 +76,9 @@ private:
     QAction* _actAddRegion;
     QAction* _actRemove;
     QAction* _actUndo;
+    QAction* _actViewReset;
+    QAction* _actZoomIn;
+    QAction* _actZoomOut;
 
     QToolBar* _tools;
     QLineEdit* _name;
