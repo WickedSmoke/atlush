@@ -238,7 +238,13 @@ void AWindow::createActions()
     _actRemove = new QAction(QIcon(":/icons/image-remove.png"),
                                 "Remove Item", this);
     _actRemove->setShortcut(QKeySequence(Qt::Key_Delete));
+    _actRemove->setEnabled(false);
     connect(_actRemove, SIGNAL(triggered()), SLOT(removeSelected()));
+
+    _actUndo = new QAction( "&Undo", this );
+    _actUndo->setShortcut(QKeySequence::Undo);
+    _actUndo->setEnabled(false);
+    connect(_actUndo, SIGNAL(triggered()), SLOT(undo()));
 }
 
 
@@ -260,6 +266,8 @@ void AWindow::createMenus()
     edit->addAction( _actAddImage );
     edit->addAction( _actAddRegion );
     edit->addAction( _actRemove );
+    edit->addSeparator();
+    edit->addAction( _actUndo );
 
     bar->addSeparator();
 
@@ -417,6 +425,13 @@ void AWindow::removeSelected()
     }
 }
 
+void AWindow::undo()
+{
+    if (_selItem) {
+        _selItem->setPos(_selPos);
+    }
+}
+
 // Set QSpinBox value without emitting the valueChanged() signal.
 static void assignSpin(QSpinBox* spin, int val)
 {
@@ -432,6 +447,9 @@ void AWindow::syncSelection()
     bool isRegion = isSelected && (sel[0]->type() == GIT_RECT);
 
     _actAddRegion->setEnabled(isSelected);
+    _actRemove->setEnabled(isSelected);
+    _actUndo->setEnabled(isSelected);
+
     _name->setEnabled(isRegion);
     _spinX->setEnabled(isSelected);
     _spinY->setEnabled(isSelected);
@@ -449,6 +467,7 @@ void AWindow::syncSelection()
         assignSpin(_spinH, val.h);
 
         _selItem = sel[0];
+        _selPos = _selItem->pos();
     } else {
         _selItem = NULL;
     }

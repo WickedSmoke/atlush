@@ -42,6 +42,7 @@ private slots:
     void addImage();
     void addRegion();
     void removeSelected();
+    void undo();
     void syncSelection();
     void newProject();
     void modName();
@@ -71,6 +72,7 @@ private:
     QAction* _actAddImage;
     QAction* _actAddRegion;
     QAction* _actRemove;
+    QAction* _actUndo;
 
     QToolBar* _tools;
     QLineEdit* _name;
@@ -82,6 +84,7 @@ private:
     QGraphicsScene* _scene;     // Stores our project.
     QGraphicsView* _view;
     QGraphicsItem* _selItem;
+    QPointF        _selPos;
 
     QString _prevProjPath;
     QString _prevImagePath;
