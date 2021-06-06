@@ -5,6 +5,7 @@ CONFIG += qt debug
 QT += widgets
 RESOURCES += icons.qrc
 
-HEADERS += AWindow.h
+HEADERS += AWindow.h IOWidget.h RecentFiles.h
 
-SOURCES += AWindow.cpp
+SOURCES += AWindow.cpp IOWidget.cpp RecentFiles.cpp
+

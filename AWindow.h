@@ -14,6 +14,8 @@
 
 class QLineEdit;
 class QSpinBox;
+class IOWidget;
+class IODialog;
 
 class AWindow : public QMainWindow
 {
@@ -54,6 +56,9 @@ private slots:
     void modY(int);
     void modW(int);
     void modH(int);
+    void editPipelines();
+    void pipelinesChanged();
+    void execute(int pi, int push);
 
 private:
 
@@ -87,6 +92,10 @@ private:
     QSpinBox*  _spinW;
     QSpinBox*  _spinH;
 
+    QToolBar* _iobar;
+    IOWidget* _io;
+    IODialog* _ioDialog;
+
     QGraphicsScene* _scene;     // Stores our project.
     QGraphicsView* _view;
     QGraphicsItem* _selItem;
@@ -94,6 +103,7 @@ private:
 
     QString _prevProjPath;
     QString _prevImagePath;
+    QString _ioSpec;
     RecentFiles _recent;
     QObject* _modifiedStr;
 

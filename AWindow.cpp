@@ -18,6 +18,7 @@
 #include <QStyle>
 #include <QToolBar>
 #include "AWindow.h"
+#include "IOWidget.h"
 #include "Atlush.h"
 
 #define UTF8(str)   str.toUtf8().constData()
@@ -127,7 +128,7 @@ void AView::wheelEvent(QWheelEvent* event)
 
 //----------------------------------------------------------------------------
 
-AWindow::AWindow() : _selItem(NULL), _modifiedStr(NULL)
+AWindow::AWindow() : _ioDialog(NULL), _selItem(NULL), _modifiedStr(NULL)
 {
     setWindowTitle(APP_NAME);
 
@@ -147,7 +148,10 @@ AWindow::AWindow() : _selItem(NULL), _modifiedStr(NULL)
     resize(settings.value("window-size", QSize(480, 480)).toSize());
     _prevProjPath  = settings.value("prev-project").toString();
     _prevImagePath = settings.value("prev-image").toString();
+    _ioSpec = settings.value("io-pipelines").toString();
     _recent.setFiles(settings.value("recent-files").toStringList());
+
+    _io->setSpec(_ioSpec);
 }
 
 
@@ -157,6 +161,7 @@ void AWindow::closeEvent( QCloseEvent* ev )
     settings.setValue("window-size", size());
     settings.setValue("prev-project", _prevProjPath);
     settings.setValue("prev-image", _prevImagePath);
+    settings.setValue("io-pipelines", _ioSpec);
     settings.setValue("recent-files", _recent.files);
 
     QMainWindow::closeEvent( ev );
@@ -264,11 +269,13 @@ void AWindow::createMenus()
     file->addAction( _actQuit );
 
     QMenu* edit = bar->addMenu( "&Edit" );
+    edit->addAction( _actUndo );
+    edit->addSeparator();
     edit->addAction( _actAddImage );
     edit->addAction( _actAddRegion );
     edit->addAction( _actRemove );
     edit->addSeparator();
-    edit->addAction( _actUndo );
+    edit->addAction("&Pipelines", this, SLOT(editPipelines()));
 
     QMenu* view = bar->addMenu( "&View" );
     view->addAction( _actViewReset );
@@ -314,6 +321,13 @@ void AWindow::createTools()
     connect(_spinY, SIGNAL(valueChanged(int)), SLOT(modY(int)));
     connect(_spinW, SIGNAL(valueChanged(int)), SLOT(modW(int)));
     connect(_spinH, SIGNAL(valueChanged(int)), SLOT(modH(int)));
+
+    _io = new IOWidget;
+    connect(_io, SIGNAL(execute(int,int)), SLOT(execute(int,int)));
+
+    _iobar = new QToolBar;
+    _iobar->addWidget(_io);
+    addToolBar(Qt::TopToolBarArea, _iobar);
 }
 
 void AWindow::updateProjectName(const QString& path)
@@ -540,6 +554,52 @@ void AWindow::modW(int n)
 void AWindow::modH(int n)
 {
     setRectDim(_selItem, -1, n);
+}
+
+void AWindow::editPipelines()
+{
+    if (! _ioDialog) {
+        _ioDialog = new IODialog(this);
+        _ioDialog->setModal(true);
+        connect(_ioDialog, SIGNAL(accepted()), SLOT(pipelinesChanged()));
+    }
+    _ioDialog->edit(&_ioSpec);
+    _ioDialog->show();
+}
+
+void AWindow::pipelinesChanged()
+{
+    _io->setSpec(_ioSpec);
+}
+
+void AWindow::execute(int pi, int push)
+{
+    char fileVar[40];
+    sprintf(fileVar, "/tmp/atlush-%lld.atl", qApp->applicationPid());
+    setenv("ATL", fileVar, 1);
+
+    QString fn(fileVar);
+    if (push) {
+        if (! saveProject(fn)) {
+            saveFailed(this, fn);
+            return;
+        }
+    }
+
+    QString cmd;
+    int stat = io_execute(_ioSpec, pi, push, cmd);
+    if (stat < 0) {
+        QString error("Could not run: ");
+        QMessageBox::warning(this, "System Failure", error + cmd);
+    } else if (stat) {
+        QString error("Command: ");
+        error += cmd;
+        error += "\n\nExit Status: ";
+        error += QString::number(stat);
+        QMessageBox::warning(this, "I/O Command Failure", error);
+    } else if(! push) {
+        openFile(fn);
+    }
 }
 
 //----------------------------------------------------------------------------
