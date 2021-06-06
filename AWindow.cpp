@@ -9,16 +9,21 @@
 #include <QFileDialog>
 #include <QGraphicsPixmapItem>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QSettings>
+#include <QSpinBox>
 #include <QStyle>
 #include <QToolBar>
 #include "AWindow.h"
 #include "Atlush.h"
 
 #define UTF8(str)   str.toUtf8().constData()
+
+#define GIT_PIXMAP  QGraphicsPixmapItem::Type
+#define GIT_RECT    QGraphicsRectItem::Type
 
 
 enum ItemData {
@@ -42,7 +47,7 @@ static void itemValues(ItemValues& iv, const QGraphicsItem* item)
     iv.w = int(rect.width());
     iv.h = int(rect.height());
 
-    if (item->type() == QGraphicsPixmapItem::Type) {
+    if (item->type() == GIT_PIXMAP) {
         // boundingRect grows by 1 pixel when ItemIsSelectable is used!
         iv.w -= 1;
         iv.h -= 1;
@@ -135,7 +140,7 @@ void AView::wheelEvent(QWheelEvent* event)
 
 //----------------------------------------------------------------------------
 
-AWindow::AWindow()
+AWindow::AWindow() : _selItem(NULL), _modifiedStr(NULL)
 {
     setWindowTitle(APP_NAME);
 
@@ -144,6 +149,7 @@ AWindow::AWindow()
     createTools();
 
     _scene = new QGraphicsScene;
+    connect(_scene, SIGNAL(selectionChanged()), SLOT(syncSelection()));
 
     _view = new AView(_scene);
     _view->setMinimumSize(128, 128);
@@ -198,40 +204,41 @@ void AWindow::createActions()
 
     _actNew = new QAction(STD_ICON(SP_FileIcon), "&New Project", this);
     _actNew->setShortcut(QKeySequence::New);
-    connect( _actNew, SIGNAL(triggered()), this, SLOT(newProject()));
+    connect( _actNew, SIGNAL(triggered()), SLOT(newProject()));
 
     _actOpen = new QAction(STD_ICON(SP_DialogOpenButton), "&Open...", this );
     _actOpen->setShortcut(QKeySequence::Open);
-    connect( _actOpen, SIGNAL(triggered()), this, SLOT(open()));
+    connect( _actOpen, SIGNAL(triggered()), SLOT(open()));
 
     _actSave = new QAction(STD_ICON(SP_DialogSaveButton), "&Save", this );
     _actSave->setShortcut(QKeySequence::Save);
-    connect( _actSave, SIGNAL(triggered()), this, SLOT(save()));
+    connect( _actSave, SIGNAL(triggered()), SLOT(save()));
 
     _actSaveAs = new QAction("Save &As...", this);
     _actSaveAs->setShortcut(QKeySequence::SaveAs);
-    connect( _actSaveAs, SIGNAL(triggered()), this, SLOT(saveAs()));
+    connect( _actSaveAs, SIGNAL(triggered()), SLOT(saveAs()));
 
     _actQuit = new QAction( "&Quit", this );
     _actQuit->setShortcut(QKeySequence::Quit);
-    connect( _actQuit, SIGNAL(triggered()), this, SLOT(close()));
+    connect( _actQuit, SIGNAL(triggered()), SLOT(close()));
 
     _actAbout = new QAction( "&About", this );
-    connect( _actAbout, SIGNAL(triggered()), this, SLOT(showAbout()));
+    connect( _actAbout, SIGNAL(triggered()), SLOT(showAbout()));
 
     _actAddImage = new QAction(QIcon(":/icons/image-add.png"),
                                "Add Image", this);
     _actAddImage->setShortcut(QKeySequence(Qt::Key_Insert));
-    connect(_actAddImage, SIGNAL(triggered()), this, SLOT(addImage()));
+    connect(_actAddImage, SIGNAL(triggered()), SLOT(addImage()));
 
     _actAddRegion = new QAction(QIcon(":/icons/region-add.png"),
                                 "Add Region", this);
-    connect(_actAddRegion, SIGNAL(triggered()), this, SLOT(addRegion()));
+    _actAddRegion->setEnabled(false);
+    connect(_actAddRegion, SIGNAL(triggered()), SLOT(addRegion()));
 
     _actRemove = new QAction(QIcon(":/icons/image-remove.png"),
                                 "Remove Item", this);
     _actRemove->setShortcut(QKeySequence(Qt::Key_Delete));
-    connect(_actRemove, SIGNAL(triggered()), this, SLOT(removeSelected()));
+    connect(_actRemove, SIGNAL(triggered()), SLOT(removeSelected()));
 }
 
 
@@ -260,15 +267,39 @@ void AWindow::createMenus()
     help->addAction( _actAbout );
 }
 
+QSpinBox* makeSpinBox()
+{
+    QSpinBox* spin = new QSpinBox;
+    spin->setRange(0, 8192);
+    spin->setEnabled(false);
+    return spin;
+}
 
 void AWindow::createTools()
 {
     _tools = addToolBar("");
     _tools->addAction(_actOpen);
     _tools->addAction(_actSave);
+
+    _tools->addSeparator();
     _tools->addAction(_actAddImage);
     _tools->addAction(_actAddRegion);
     _tools->addAction(_actRemove);
+
+    _tools->addSeparator();
+    _tools->addWidget(_name = new QLineEdit);
+    _tools->addWidget(_spinX = makeSpinBox());
+    _tools->addWidget(_spinY = makeSpinBox());
+    _tools->addWidget(_spinH = makeSpinBox());
+    _tools->addWidget(_spinW = makeSpinBox());
+
+    _name->setEnabled(false);
+    connect(_name, SIGNAL(editingFinished()), SLOT(modName()) );
+    connect(_name, SIGNAL(textEdited(const QString&)), SLOT(stringEdit()) );
+    connect(_spinX, SIGNAL(valueChanged(int)), SLOT(modX(int)));
+    connect(_spinY, SIGNAL(valueChanged(int)), SLOT(modY(int)));
+    connect(_spinW, SIGNAL(valueChanged(int)), SLOT(modW(int)));
+    connect(_spinH, SIGNAL(valueChanged(int)), SLOT(modH(int)));
 }
 
 void AWindow::updateProjectName(const QString& path)
@@ -368,10 +399,12 @@ void AWindow::addRegion()
     ItemList sel = _scene->selectedItems();
     if (! sel.empty()) {
         QGraphicsItem* item = sel[0];
-        if (item->type() != QGraphicsPixmapItem::Type)
+        if (item->type() != GIT_PIXMAP)
             item = item->parentItem();
-        if (item)
-            makeRegion(item, 0, 0, 32, 32);
+        if (item) {
+            QGraphicsItem* child = makeRegion(item, 0, 0, 32, 32);
+            child->setData(ID_NAME, QString("<unnamed>"));
+        }
     }
 }
 
@@ -382,6 +415,106 @@ void AWindow::removeSelected()
         _scene->removeItem(sel[0]);
         delete sel[0];
     }
+}
+
+// Set QSpinBox value without emitting the valueChanged() signal.
+static void assignSpin(QSpinBox* spin, int val)
+{
+    spin->blockSignals(true);
+    spin->setValue(val);
+    spin->blockSignals(false);
+}
+
+void AWindow::syncSelection()
+{
+    ItemList sel = _scene->selectedItems();
+    bool isSelected = ! sel.empty();
+    bool isRegion = isSelected && (sel[0]->type() == GIT_RECT);
+
+    _actAddRegion->setEnabled(isSelected);
+    _name->setEnabled(isRegion);
+    _spinX->setEnabled(isSelected);
+    _spinY->setEnabled(isSelected);
+    _spinW->setEnabled(isRegion);
+    _spinH->setEnabled(isRegion);
+
+    if (isSelected) {
+        ItemValues val;
+        itemValues(val, sel[0]);
+
+        _name->setText(val.name);
+        assignSpin(_spinX, val.x);
+        assignSpin(_spinY, val.y);
+        assignSpin(_spinW, val.w);
+        assignSpin(_spinH, val.h);
+
+        _selItem = sel[0];
+    } else {
+        _selItem = NULL;
+    }
+}
+
+void AWindow::modName()
+{
+    // Ignore editingFinished() signal unless string was actually changed.
+    if (_modifiedStr == _name) {
+        _modifiedStr = NULL;
+
+        if (_selItem)
+            _selItem->setData(ID_NAME, _name->text());
+    }
+}
+
+// Record that a QLineEdit was edited.
+void AWindow::stringEdit()
+{
+    _modifiedStr = sender();
+}
+
+void AWindow::modX(int n)
+{
+    if (_selItem) {
+        qreal r = qreal(n);
+        QGraphicsItem* pi = _selItem->parentItem();
+        if (pi)
+            r -= pi->scenePos().x();
+        _selItem->setX(r);
+    }
+}
+
+void AWindow::modY(int n)
+{
+    if (_selItem) {
+        qreal r = qreal(n);
+        QGraphicsItem* pi = _selItem->parentItem();
+        if (pi)
+            r -= pi->scenePos().y();
+        _selItem->setY(r);
+    }
+}
+
+// Set either width or height.
+static void setRectDim(QGraphicsItem* gi, int w, int h)
+{
+    if (gi && gi->type() == GIT_RECT) {
+        QGraphicsRectItem* item = static_cast<QGraphicsRectItem*>(gi);
+        QRectF rect(item->rect());
+        if (w < 0)
+            rect.setHeight(h);
+        else
+            rect.setWidth(w);
+        item->setRect(rect);
+    }
+}
+
+void AWindow::modW(int n)
+{
+    setRectDim(_selItem, n, -1);
+}
+
+void AWindow::modH(int n)
+{
+    setRectDim(_selItem, -1, n);
 }
 
 //----------------------------------------------------------------------------
@@ -414,7 +547,6 @@ QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
     item->setFlags(QGraphicsItem::ItemIsMovable |
                    QGraphicsItem::ItemIsSelectable);
     item->setPos(x, y);
-    item->setData(ID_NAME, QString("<unnamed>"));
 
     //QPointF p = item->scenePos();
     //printf("KR region %f,%f\n", p.x(), p.y());
@@ -444,21 +576,24 @@ bool AWindow::loadProject(const QString& path)
             if (fscanf(fp, "%999[^\"]\" %d,%d,%d,%d", buf, &x, &y, &w, &h) != 5)
                 goto fail;
             //printf("KR %s %d,%d,%d,%d\n", buf, x, y, w, h);
-
+        {
+            QString name(buf);
             if (nested) {
                 if (pitem) {
                     QPointF pp = pitem->scenePos();
+                    QGraphicsItem* region =
                     makeRegion(pitem, x - int(pp.x()), y - int(pp.y()), w, h);
+                    region->setData(ID_NAME, name);
                 }
             } else {
-                QString fn(buf);
-                QPixmap pix(fn);
+                QPixmap pix(name);
                 if (pix.isNull())
                     pix = QPixmap(":/icons/missing.png");
 
                 pitem = makeImage(pix, x, y);
-                pitem->setData(ID_NAME, fn);
+                pitem->setData(ID_NAME, name);
             }
+        }
             break;
 
         case '[':
@@ -505,7 +640,7 @@ bool AWindow::saveProject(const QString& path)
 
     bool done = false;
     each_item(it) {
-        if (it->type() != QGraphicsPixmapItem::Type)
+        if (it->type() != GIT_PIXMAP)
             continue;
         itemValues(val, it);
         if (regionWriteBoron(fp, val) < 0)
@@ -515,7 +650,7 @@ bool AWindow::saveProject(const QString& path)
         if (! clist.empty()) {
             fprintf(fp, "[\n");
             for(const QGraphicsItem* ch : clist) {
-                if (ch->type() != QGraphicsRectItem::Type)
+                if (ch->type() != GIT_RECT)
                     continue;
                 fprintf(fp, "  ");
                 itemValues(val, ch);

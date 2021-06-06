@@ -12,6 +12,9 @@
 #include "RecentFiles.h"
 
 
+class QLineEdit;
+class QSpinBox;
+
 class AWindow : public QMainWindow
 {
     Q_OBJECT
@@ -39,7 +42,14 @@ private slots:
     void addImage();
     void addRegion();
     void removeSelected();
+    void syncSelection();
     void newProject();
+    void modName();
+    void stringEdit();
+    void modX(int);
+    void modY(int);
+    void modW(int);
+    void modH(int);
 
 private:
 
@@ -63,13 +73,20 @@ private:
     QAction* _actRemove;
 
     QToolBar* _tools;
+    QLineEdit* _name;
+    QSpinBox*  _spinX;
+    QSpinBox*  _spinY;
+    QSpinBox*  _spinW;
+    QSpinBox*  _spinH;
 
     QGraphicsScene* _scene;     // Stores our project.
     QGraphicsView* _view;
+    QGraphicsItem* _selItem;
 
     QString _prevProjPath;
     QString _prevImagePath;
     RecentFiles _recent;
+    QObject* _modifiedStr;
 
     // Disabled copy constructor and operator=
     AWindow( const AWindow & ) : QMainWindow( 0 ) {}
