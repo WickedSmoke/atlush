@@ -20,23 +20,10 @@
 #include "AWindow.h"
 #include "IOWidget.h"
 #include "Atlush.h"
-
-#define UTF8(str)   str.toUtf8().constData()
-
-#define GIT_PIXMAP  QGraphicsPixmapItem::Type
-#define GIT_RECT    QGraphicsRectItem::Type
+#include "ItemValues.h"
 
 
-enum ItemData {
-    ID_NAME
-};
-
-struct ItemValues {
-    QByteArray name;
-    int x, y, w, h;
-};
-
-static void itemValues(ItemValues& iv, const QGraphicsItem* item)
+void itemValues(ItemValues& iv, const QGraphicsItem* item)
 {
     iv.name = item->data(ID_NAME).toString().toUtf8();
 
@@ -54,14 +41,6 @@ static void itemValues(ItemValues& iv, const QGraphicsItem* item)
         iv.h -= 1;
     }
 }
-
-typedef QList<QGraphicsItem*> ItemList;
-
-#define each_item(pi) \
-    for(const QGraphicsItem* pi : _scene->items(Qt::AscendingOrder))
-
-#define each_child(pi,ci) \
-    for(const QGraphicsItem* ci : pi->childItems())
 
 //----------------------------------------------------------------------------
 
@@ -275,7 +254,8 @@ void AWindow::createMenus()
     edit->addAction( _actAddRegion );
     edit->addAction( _actRemove );
     edit->addSeparator();
-    edit->addAction("&Pipelines", this, SLOT(editPipelines()));
+    edit->addAction("&Pack Images", this, SLOT(packImages()));
+    edit->addAction("Pipelines", this, SLOT(editPipelines()));
 
     QMenu* view = bar->addMenu( "&View" );
     view->addAction( _actViewReset );

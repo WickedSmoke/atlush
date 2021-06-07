@@ -56,6 +56,7 @@ private slots:
     void modY(int);
     void modW(int);
     void modH(int);
+    void packImages();
     void editPipelines();
     void pipelinesChanged();
     void execute(int pi, int push);
