@@ -10,6 +10,8 @@
 
 void RecentFiles::install( QMenu* menu, QObject* receiver, const char* method )
 {
+    menu->setToolTipsVisible(true);     // Full paths are shown in tips.
+
     _separator = menu->addSeparator();
     int i;
     for( i = 0; i < MaxRecentFiles; ++i )
@@ -68,8 +70,7 @@ void RecentFiles::addFile( const QString* str )
                        .arg( QFileInfo(files[i]).fileName() );
 
         _action[i]->setText( text );
-        // Qt doesn't show tool tips on menus, so we use a status tip.
-        _action[i]->setStatusTip( files[i] );
+        _action[i]->setToolTip( files[i] );
         _action[i]->setData( i );
         _action[i]->setVisible( true );
     }
