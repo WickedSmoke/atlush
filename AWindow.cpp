@@ -107,7 +107,7 @@ void AView::wheelEvent(QWheelEvent* event)
 
 //----------------------------------------------------------------------------
 
-AWindow::AWindow() : _ioDialog(NULL), _selItem(NULL), _modifiedStr(NULL)
+AWindow::AWindow() : _modifiedStr(NULL), _ioDialog(NULL), _selItem(NULL)
 {
     setWindowTitle(APP_NAME);
 
@@ -122,6 +122,8 @@ AWindow::AWindow() : _ioDialog(NULL), _selItem(NULL), _modifiedStr(NULL)
     _view->setMinimumSize(128, 128);
     _view->setBackgroundBrush(QBrush(Qt::darkGray));
     setCentralWidget(_view);
+
+    _bgPix = QPixmap(":/icons/transparent.png");
 
     QSettings settings;
     resize(settings.value("window-size", QSize(480, 480)).toSize());
@@ -319,6 +321,16 @@ void AWindow::updateProjectName(const QString& path)
     setWindowTitle(title);
 }
 
+static void setupBackground(QGraphicsScene* scene, const QSize& size,
+                            const QBrush& brush)
+{
+    QRectF bound(0, 0, size.width(), size.height());
+    auto rect = scene->addRect(bound, QPen(Qt::darkRed), brush);
+
+    // Negative Z distinguishes this from region rectangle items.
+    rect->setZValue(-1);
+}
+
 bool AWindow::openFile(const QString& file)
 {
     _scene->clear();
@@ -326,6 +338,8 @@ bool AWindow::openFile(const QString& file)
     int line;
     if (loadProject(file, &line)) {
         updateProjectName(file);
+        if (! _docSize.isEmpty())
+            setupBackground(_scene, _docSize, QBrush(_bgPix));
         return true;
     } else {
         QString error;
@@ -685,6 +699,15 @@ add_item:
             --nested;
             break;
 
+        case 'i':
+            if (fscanf(fp, "mage-atlas %d %d,%d", &x, &w, &h) != 3)
+                goto fail;
+            if (x != 1)
+                goto fail;          // Invalid version.
+            _docSize.setWidth(w);
+            _docSize.setHeight(h);
+            break;
+
         case '{':
             if (fscanf(fp, "%999[^}]} %d,%d,%d,%d", buf, &x, &y, &w, &h) != 5)
                 goto fail;
@@ -725,6 +748,8 @@ static int regionWriteBoron(FILE* fp, const ItemValues& iv) {
                    iv.name.constData(), iv.x, iv.y, iv.w, iv.h);
 }
 
+#define IS_REGION(gi)   (gi->type() == GIT_RECT && gi->zValue() >= 0.0)
+
 /*
  * Replace project file with items in scene.
  */
@@ -734,6 +759,11 @@ bool AWindow::saveProject(const QString& path)
     FILE* fp = fopen(UTF8(path), "w");
     if (! fp)
         return false;
+
+    if (! _docSize.isEmpty()) {
+        fprintf(fp, "image-atlas 1 %d,%d\n",
+                _docSize.width(), _docSize.height());
+    }
 
     bool done = false;
     each_item(it) {
@@ -747,12 +777,12 @@ bool AWindow::saveProject(const QString& path)
         if (! clist.empty()) {
             fprintf(fp, "[\n");
             for(const QGraphicsItem* ch : clist) {
-                if (ch->type() != GIT_RECT)
-                    continue;
-                fprintf(fp, "  ");
-                itemValues(val, ch);
-                if (regionWriteBoron(fp, val) < 0)
-                    goto fail;
+                if (IS_REGION(ch)) {
+                    fprintf(fp, "  ");
+                    itemValues(val, ch);
+                    if (regionWriteBoron(fp, val) < 0)
+                        goto fail;
+                }
             }
             fprintf(fp, "]\n");
         }

@@ -92,6 +92,7 @@ private:
     QSpinBox*  _spinY;
     QSpinBox*  _spinW;
     QSpinBox*  _spinH;
+    QObject* _modifiedStr;
 
     QToolBar* _iobar;
     IOWidget* _io;
@@ -100,13 +101,15 @@ private:
     QGraphicsScene* _scene;     // Stores our project.
     QGraphicsView* _view;
     QGraphicsItem* _selItem;
+    QPixmap        _bgPix;
     QPointF        _selPos;
+    QSize          _docSize;
 
+    // Settings
     QString _prevProjPath;
     QString _prevImagePath;
     QString _ioSpec;
     RecentFiles _recent;
-    QObject* _modifiedStr;
 
     // Disabled copy constructor and operator=
     AWindow( const AWindow & ) : QMainWindow( 0 ) {}
