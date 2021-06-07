@@ -16,6 +16,7 @@ class QLineEdit;
 class QSpinBox;
 class IOWidget;
 class IODialog;
+class CanvasDialog;
 
 class AWindow : public QMainWindow
 {
@@ -57,6 +58,8 @@ private slots:
     void modW(int);
     void modH(int);
     void packImages();
+    void editDocSize();
+    void canvasChanged();
     void editPipelines();
     void pipelinesChanged();
     void execute(int pi, int push);
@@ -93,6 +96,7 @@ private:
     QSpinBox*  _spinW;
     QSpinBox*  _spinH;
     QObject* _modifiedStr;
+    CanvasDialog* _canvasDialog;
 
     QToolBar* _iobar;
     IOWidget* _io;

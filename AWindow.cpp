@@ -18,6 +18,7 @@
 #include <QStyle>
 #include <QToolBar>
 #include "AWindow.h"
+#include "CanvasDialog.h"
 #include "IOWidget.h"
 #include "Atlush.h"
 #include "ItemValues.h"
@@ -107,7 +108,8 @@ void AView::wheelEvent(QWheelEvent* event)
 
 //----------------------------------------------------------------------------
 
-AWindow::AWindow() : _modifiedStr(NULL), _ioDialog(NULL), _selItem(NULL)
+AWindow::AWindow()
+    : _modifiedStr(NULL), _canvasDialog(NULL), _ioDialog(NULL), _selItem(NULL)
 {
     setWindowTitle(APP_NAME);
 
@@ -257,12 +259,16 @@ void AWindow::createMenus()
     edit->addAction( _actRemove );
     edit->addSeparator();
     edit->addAction("&Pack Images", this, SLOT(packImages()));
-    edit->addAction("Pipelines", this, SLOT(editPipelines()));
+    edit->addSeparator();
+    edit->addAction("Canvas &Size...", this, SLOT(editDocSize()));
 
     QMenu* view = bar->addMenu( "&View" );
     view->addAction( _actViewReset );
     view->addAction( _actZoomIn );
     view->addAction( _actZoomOut );
+
+    QMenu* sett = bar->addMenu( "&Settings" );
+    sett->addAction("Configure &Pipelines...", this, SLOT(editPipelines()));
 
     bar->addSeparator();
 
@@ -321,6 +327,8 @@ void AWindow::updateProjectName(const QString& path)
     setWindowTitle(title);
 }
 
+#define BG_Z    -1.0
+
 static void setupBackground(QGraphicsScene* scene, const QSize& size,
                             const QBrush& brush)
 {
@@ -328,7 +336,7 @@ static void setupBackground(QGraphicsScene* scene, const QSize& size,
     auto rect = scene->addRect(bound, QPen(Qt::darkRed), brush);
 
     // Negative Z distinguishes this from region rectangle items.
-    rect->setZValue(-1);
+    rect->setZValue(BG_Z);
 }
 
 bool AWindow::openFile(const QString& file)
@@ -556,6 +564,32 @@ void AWindow::modW(int n)
 void AWindow::modH(int n)
 {
     setRectDim(_selItem, -1, n);
+}
+
+void AWindow::editDocSize()
+{
+    if (! _canvasDialog) {
+        _canvasDialog = new CanvasDialog(this);
+        _canvasDialog->setModal(true);
+        connect(_canvasDialog, SIGNAL(accepted()), SLOT(canvasChanged()));
+    }
+    _canvasDialog->edit(&_docSize);
+    _canvasDialog->show();
+}
+
+void AWindow::canvasChanged()
+{
+    each_item(it) {
+        if (it->type() == GIT_RECT && it->zValue() == BG_Z) {
+            QGraphicsRectItem* rit = (QGraphicsRectItem*) it;
+            QRectF rect(rit->rect());
+            rect.setWidth(_docSize.width());
+            rect.setHeight(_docSize.height());
+            rit->setRect(rect);
+            return;
+        }
+    }
+    setupBackground(_scene, _docSize, QBrush(_bgPix));
 }
 
 void AWindow::editPipelines()
