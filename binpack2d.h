@@ -226,18 +226,19 @@ public:
   {}
   
   Content( const _T &content, const Coord &coord, const Size &size, bool rotated )
-    : 
-      content(content),
+    : rotated(rotated),
       coord(coord),
       size(size),
-      rotated(rotated)
+      content(content)
   {}
   
+#ifdef PACK_ROTATE
   void Rotate() {
    
     rotated = !rotated;
     size = Size( size.h, size.w );
   }
+#endif
   
   bool intersects(const Content<_T> &that) const {
     
@@ -364,6 +365,7 @@ public:
       }
     }
     
+#ifdef PACK_ROTATE
     // EXPERIMENTAL - TRY ROTATED?
     content.Rotate();
     for( Coord::List::iterator itor = topLefts.begin(); itor != topLefts.end(); itor++ ) {
@@ -378,7 +380,7 @@ public:
       }
     }
     ////////////////////////////////
-    
+#endif
     
     return false;
   }
