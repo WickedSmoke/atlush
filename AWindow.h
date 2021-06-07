@@ -69,7 +69,7 @@ private:
     void updateProjectName(const QString& path);
     QGraphicsPixmapItem* makeImage(const QPixmap&, int x, int y);
     QGraphicsRectItem* makeRegion(QGraphicsItem* parent, int, int, int, int);
-    bool loadProject(const QString& path);
+    bool loadProject(const QString& path, int* errorLine);
     bool saveProject(const QString& path);
 
     QAction* _actNew;

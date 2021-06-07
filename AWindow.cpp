@@ -323,12 +323,20 @@ bool AWindow::openFile(const QString& file)
 {
     _scene->clear();
 
-    if (loadProject(file)) {
+    int line;
+    if (loadProject(file, &line)) {
         updateProjectName(file);
         return true;
     } else {
-        QString error( "Error opening file " );
-        QMessageBox::warning( this, "Load", error + file );
+        QString error;
+        if (line < 0)
+            error = "Error opening file ";
+        else {
+            error = "Parse error on line ";
+            error += QString::number(line);
+            error += " of ";
+        }
+        QMessageBox::warning( this, "Load Error", error + file );
         return false;
     }
 }
@@ -621,12 +629,17 @@ QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
 
 /*
  * Append items in project file to scene.
+ *
+ * Return false on error.  In this case errorLine is set to either the line
+ * number where parsing failed or -1 on a file open or read error.
  */
-bool AWindow::loadProject(const QString& path)
+bool AWindow::loadProject(const QString& path, int* errorLine)
 {
     FILE* fp = fopen(UTF8(path), "r");
-    if (! fp)
+    if (! fp) {
+        *errorLine = -1;
         return false;
+    }
 
     bool done = false;
     {
@@ -634,6 +647,7 @@ bool AWindow::loadProject(const QString& path)
     char* buf = new char[1000];
     int x, y, w, h;
     int nested = 0;
+    int lineCount = 0;
 
     // Parse Boron string!/coord!/block! values.
     while (fread(buf, 1, 1, fp) == 1) {
@@ -685,7 +699,10 @@ add_item:
 
         case ' ':
         case '\t':
+            break;
+
         case '\n':
+            ++lineCount;
             break;
 
         default:
@@ -695,6 +712,7 @@ add_item:
     done = true;
 
 fail:
+    *errorLine = lineCount;
     delete[] buf;
     }
 
