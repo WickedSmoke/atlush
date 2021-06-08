@@ -4,28 +4,40 @@
 #include "AWindow.h"
 #include "ItemValues.h"
 #include "binpack2d.h"
+#include "ExtractDialog.h"
 
 using namespace BinPack2D;
 
 typedef QGraphicsItem* APData;
 typedef Content<APData>::Vector::iterator ABinPackIter;
 
-void AWindow::packImages()
-{
+struct GraphicsItemPacker {
     ContentAccumulator<APData> input;
     ContentAccumulator<APData> output;
     ContentAccumulator<APData> leftover;
 
-    int w, h;
-    if (_docSize.isEmpty())
-        w = h = 1024;
-    else {
-        w = _docSize.width();
-        h = _docSize.height();
+    int pack(int w, int h)
+    {
+        CanvasArray<APData> canvases =
+            UniformCanvasArrayBuilder<APData>(w, h, 1).Build();
+        input.Sort();
+        canvases.Place(input, leftover);
+        canvases.CollectContent(output);
+        return leftover.Get().size();
     }
-    CanvasArray<APData> canvases =
-        UniformCanvasArrayBuilder<APData>(w, h, 1).Build();
+};
 
+static void warnIncomplete(QWidget* parent, int leftover)
+{
+    QMessageBox::warning(parent, "Pack Incomplete",
+            QString::number(leftover) + QString(" images did not fit."));
+}
+
+void AWindow::packImages()
+{
+    GraphicsItemPacker pk;
+    int w, h;
+    int leftover;
 
     // Collect images.
     ItemValues val;
@@ -38,25 +50,137 @@ void AWindow::packImages()
         val.w += pad;
         val.h += pad;
 
-        input += Content<APData>((QGraphicsItem*) gi,
+        pk.input += Content<APData>((QGraphicsItem*) gi,
                                 Coord(val.x, val.y), Size(val.w, val.h), false);
     }
 
     // Pack 'em.
-    input.Sort();
-    bool ok = canvases.Place(input, leftover);
-    canvases.CollectContent(output);
+    if (_docSize.isEmpty())
+        w = h = 1024;
+    else {
+        w = _docSize.width();
+        h = _docSize.height();
+    }
+    leftover = pk.pack(w, h);
 
     // Update scene.
     ABinPackIter it;
-    for (it = output.Get().begin(); it != output.Get().end(); it++) {
+    for (it = pk.output.Get().begin(); it != pk.output.Get().end(); it++) {
         const Content<APData>& con = *it;
         con.content->setPos(con.coord.x, con.coord.y);
     }
 
-    if (! ok) {
-        QMessageBox::warning(this, "Pack Incomplete",
-                QString::number(leftover.Get().size()) +
-                QString(" images did not fit."));
+    if (leftover)
+        warnIncomplete(this, leftover);
+}
+
+void AWindow::extractRegionsOp(const QString& file, const QColor& color)
+{
+    GraphicsItemPacker pk;
+    int w, h;
+    int leftover;
+
+
+    // Collect regions.
+    ItemValues val;
+    int pad = _packPad->value();
+    each_item(gi) {
+        if (! IS_REGION(gi))
+            continue;
+        itemValues(val, gi);
+
+        val.w += pad;
+        val.h += pad;
+
+        pk.input += Content<APData>((QGraphicsItem*) gi,
+                                Coord(val.x, val.y), Size(val.w, val.h), false);
     }
+
+    if (pk.input.Get().empty()) {
+        QMessageBox::warning(this, "Extract Incomplete",
+                             "No Regions found; nothing to extract.");
+        return;
+    }
+
+    // Pack 'em.
+    if (_docSize.isEmpty())
+        w = h = 1024;
+    else {
+        w = _docSize.width();
+        h = _docSize.height();
+    }
+    leftover = pk.pack(w, h);
+
+    // Create a new image and update the scene.
+    {
+    QVector<QGraphicsItem*> removeList;
+    QPixmap newPix(w, h);  // QImage::Format_ARGB32);
+    QPainter ip;
+    QRect srcRect;
+    ABinPackIter it;
+    QGraphicsItem* si;
+    QGraphicsItem* gi;
+    QGraphicsPixmapItem* pitem;
+
+    pitem = makeImage(QPixmap(), 0, 0);
+    pitem->setData(ID_NAME, file);
+
+    newPix.fill(color);
+    ip.begin(&newPix);
+    for (it = pk.output.Get().begin(); it != pk.output.Get().end(); it++) {
+        const Content<APData>& con = *it;
+        gi = con.content;
+        si = gi->parentItem();
+
+        // Copy pixmap region.
+        if (si && IS_IMAGE(si)) {
+            QPointF pos = gi->pos();
+            QRectF rect = gi->boundingRect();
+            srcRect.setRect(pos.x(), pos.y(), rect.width(), rect.height());
+            ip.drawPixmap(QPoint(con.coord.x, con.coord.y),
+                          static_cast<QGraphicsPixmapItem*>(si)->pixmap(),
+                          srcRect);
+
+            if (removeList.indexOf(si) < 0)
+                removeList.push_back(si);
+        }
+
+        // Transfer region to new image.
+        gi->setParentItem(pitem);
+        gi->setPos(con.coord.x, con.coord.y);
+    }
+    ip.end();
+    pitem->setPixmap(newPix);
+
+    // Delete source images from scene.
+    for (int i = 0; i < removeList.size(); ++i) {
+        si = removeList.at(i);
+        _scene->removeItem(si);
+        delete si;
+    }
+
+    if (! newPix.save(file)) {
+        QString error("Could not save image to file ");
+        QMessageBox::warning(this, "Image Save Error", error + file);
+    }
+    }
+
+    if (leftover)
+        warnIncomplete(this, leftover);
+}
+
+void AWindow::extractRegions()
+{
+    QString file;
+    QColor color;
+
+    ExtractDialog* dlg = new ExtractDialog(this);
+    if (dlg->exec() == QDialog::Accepted) {
+        file  = dlg->file();
+        color = dlg->color();
+    }
+    delete dlg;
+
+    if (! file.isEmpty())
+        extractRegionsOp(file, color);
 }

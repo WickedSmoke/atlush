@@ -310,6 +310,7 @@ void AWindow::createMenus()
     edit->addAction( _actRemove );
     edit->addSeparator();
     edit->addAction( _actPack );
+    edit->addAction("Extract Regions...", this, SLOT(extractRegions()));
     edit->addSeparator();
     edit->addAction("Canvas &Size...", this, SLOT(editDocSize()));
 

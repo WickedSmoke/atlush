@@ -63,6 +63,7 @@ private slots:
     void modW(int);
     void modH(int);
     void packImages();
+    void extractRegions();
     void editDocSize();
     void canvasChanged();
     void editPipelines();
@@ -80,6 +81,7 @@ private:
     QGraphicsRectItem* makeRegion(QGraphicsItem* parent, int, int, int, int);
     bool loadProject(const QString& path, int* errorLine);
     bool saveProject(const QString& path);
+    void extractRegionsOp(const QString& file, const QColor& color);
 
     QAction* _actNew;
     QAction* _actOpen;
