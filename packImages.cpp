@@ -13,8 +13,16 @@ void AWindow::packImages()
     ContentAccumulator<APData> input;
     ContentAccumulator<APData> output;
     ContentAccumulator<APData> leftover;
+
+    int w, h;
+    if (_docSize.isEmpty())
+        w = h = 1024;
+    else {
+        w = _docSize.width();
+        h = _docSize.height();
+    }
     CanvasArray<APData> canvases =
-        UniformCanvasArrayBuilder<APData>(1024, 1024, 1).Build();
+        UniformCanvasArrayBuilder<APData>(w, h, 1).Build();
 
 
     // Collect images.
