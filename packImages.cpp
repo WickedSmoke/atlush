@@ -1,4 +1,5 @@
 #include <QGraphicsItem>
+#include <QMessageBox>
 #include "AWindow.h"
 #include "ItemValues.h"
 #include "binpack2d.h"
@@ -49,6 +50,8 @@ void AWindow::packImages()
     }
 
     if (! ok) {
-        printf( "KR leftover %ld\n", leftover.Get().size());
+        QMessageBox::warning(this, "Pack Incomplete",
+                QString::number(leftover.Get().size()) +
+                QString(" images did not fit."));
     }
 }
