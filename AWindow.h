@@ -96,8 +96,10 @@ private:
     QAction* _actZoomOut;
     QAction* _actHideRegions;
     QAction* _actLockRegions;
+    QAction* _actPack;
 
     QToolBar* _tools;
+    QToolBar* _propBar;
     QLineEdit* _name;
     QSpinBox*  _spinX;
     QSpinBox*  _spinY;
@@ -106,9 +108,12 @@ private:
     QObject* _modifiedStr;
     CanvasDialog* _canvasDialog;
 
-    QToolBar* _iobar;
+    QToolBar* _ioBar;
     IOWidget* _io;
     IODialog* _ioDialog;
+
+    QToolBar* _packBar;
+    QSpinBox* _packPad;
 
     QGraphicsScene* _scene;     // Stores our project.
     QGraphicsView* _view;

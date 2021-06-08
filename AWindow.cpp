@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QGraphicsPixmapItem>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -135,6 +136,7 @@ AWindow::AWindow()
     _prevImagePath = settings.value("prev-image").toString();
     _ioSpec = settings.value("io-pipelines").toString();
     _recent.setFiles(settings.value("recent-files").toStringList());
+    _packPad->setValue( settings.value("pack-padding").toInt() );
 
     _io->setSpec(_ioSpec);
 }
@@ -148,6 +150,7 @@ void AWindow::closeEvent( QCloseEvent* ev )
     settings.setValue("prev-image", _prevImagePath);
     settings.setValue("io-pipelines", _ioSpec);
     settings.setValue("recent-files", _recent.files);
+    settings.setValue("pack-padding", _packPad->value());
 
     QMainWindow::closeEvent( ev );
 }
@@ -249,6 +252,10 @@ void AWindow::createActions()
                 "Lock Regions", this );
     _actLockRegions->setCheckable(true);
     connect(_actLockRegions, SIGNAL(toggled(bool)), SLOT(lockRegions(bool)));
+
+    _actPack = new QAction(QIcon(":/icons/pack.png"),
+                           "&Pack Images", this );
+    connect(_actPack, SIGNAL(triggered()), SLOT(packImages()));
 }
 
 void AWindow::viewReset() { static_cast<AView*>(_view)->resetTransform(); }
@@ -300,7 +307,7 @@ void AWindow::createMenus()
     edit->addAction( _actAddRegion );
     edit->addAction( _actRemove );
     edit->addSeparator();
-    edit->addAction("&Pack Images", this, SLOT(packImages()));
+    edit->addAction( _actPack );
     edit->addSeparator();
     edit->addAction("Canvas &Size...", this, SLOT(editDocSize()));
 
@@ -343,12 +350,14 @@ void AWindow::createTools()
     _tools->addAction(_actHideRegions);
     _tools->addAction(_actLockRegions);
 
-    _tools->addSeparator();
-    _tools->addWidget(_name = new QLineEdit);
-    _tools->addWidget(_spinX = makeSpinBox());
-    _tools->addWidget(_spinY = makeSpinBox());
-    _tools->addWidget(_spinH = makeSpinBox());
-    _tools->addWidget(_spinW = makeSpinBox());
+
+    _propBar = new QToolBar;
+    _propBar->addWidget(_name = new QLineEdit);
+    _propBar->addWidget(_spinX = makeSpinBox());
+    _propBar->addWidget(_spinY = makeSpinBox());
+    _propBar->addWidget(_spinH = makeSpinBox());
+    _propBar->addWidget(_spinW = makeSpinBox());
+    addToolBar(Qt::TopToolBarArea, _propBar);
 
     _name->setEnabled(false);
     connect(_name, SIGNAL(editingFinished()), SLOT(modName()) );
@@ -358,12 +367,23 @@ void AWindow::createTools()
     connect(_spinW, SIGNAL(valueChanged(int)), SLOT(modW(int)));
     connect(_spinH, SIGNAL(valueChanged(int)), SLOT(modH(int)));
 
+
+    _packPad = new QSpinBox;
+    _packPad->setRange(0,32);
+
+    _packBar = new QToolBar;
+    _packBar->addAction(_actPack);
+    _packBar->addWidget(new QLabel("Pad:"));
+    _packBar->addWidget(_packPad);
+    addToolBar(Qt::TopToolBarArea, _packBar);
+
+
     _io = new IOWidget;
     connect(_io, SIGNAL(execute(int,int)), SLOT(execute(int,int)));
 
-    _iobar = new QToolBar;
-    _iobar->addWidget(_io);
-    addToolBar(Qt::TopToolBarArea, _iobar);
+    _ioBar = new QToolBar;
+    _ioBar->addWidget(_io);
+    addToolBar(Qt::BottomToolBarArea, _ioBar);
 }
 
 void AWindow::updateProjectName(const QString& path)

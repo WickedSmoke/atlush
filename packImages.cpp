@@ -1,5 +1,6 @@
 #include <QGraphicsItem>
 #include <QMessageBox>
+#include <QSpinBox>
 #include "AWindow.h"
 #include "ItemValues.h"
 #include "binpack2d.h"
@@ -28,10 +29,14 @@ void AWindow::packImages()
 
     // Collect images.
     ItemValues val;
+    int pad = _packPad->value();
     each_item(gi) {
         if (gi->type() != GIT_PIXMAP)
             continue;
         itemValues(val, gi);
+
+        val.w += pad;
+        val.h += pad;
 
         input += Content<APData>((QGraphicsItem*) gi,
                                 Coord(val.x, val.y), Size(val.w, val.h), false);
