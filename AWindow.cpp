@@ -120,6 +120,7 @@ AWindow::AWindow()
 
     _scene = new QGraphicsScene;
     connect(_scene, SIGNAL(selectionChanged()), SLOT(syncSelection()));
+    connect(_scene, SIGNAL(changed(const QList<QRectF>&)), SLOT(sceneChange()));
 
     _view = new AView(_scene);
     _view->setMinimumSize(128, 128);
@@ -546,6 +547,17 @@ static void assignSpin(QSpinBox* spin, int val)
     spin->blockSignals(false);
 }
 
+void AWindow::sceneChange()
+{
+    if (_selItem) {
+        QPoint pos = _selItem->scenePos().toPoint();
+        if (pos.x() != _spinX->value())
+            assignSpin(_spinX, pos.x());
+        if (pos.y() != _spinY->value())
+            assignSpin(_spinY, pos.y());
+    }
+}
+
 void AWindow::syncSelection()
 {
     ItemList sel = _scene->selectedItems();
@@ -567,8 +579,7 @@ void AWindow::syncSelection()
         itemValues(val, sel[0]);
 
         _name->setText(val.name);
-        assignSpin(_spinX, val.x);
-        assignSpin(_spinY, val.y);
+        // _spinX & Y updated in sceneChange().
         assignSpin(_spinW, val.w);
         assignSpin(_spinH, val.h);
 

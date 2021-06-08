@@ -53,6 +53,7 @@ private slots:
     void viewZoomOut();
     void hideRegions(bool);
     void lockRegions(bool);
+    void sceneChange();
     void syncSelection();
     void newProject();
     void modName();
