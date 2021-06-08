@@ -167,6 +167,13 @@ void AWindow::showAbout()
     about->show();
 }
 
+static QIcon iconAltPixmap(const char* imgOn, const char* imgOff)
+{
+    QIcon icon;
+    icon.addPixmap(QPixmap(imgOn), QIcon::Normal, QIcon::On);
+    icon.addPixmap(QPixmap(imgOff), QIcon::Normal, QIcon::Off);
+    return icon;
+}
 
 void AWindow::createActions()
 {
@@ -230,14 +237,17 @@ void AWindow::createActions()
     _actZoomOut->setShortcut(QKeySequence(Qt::Key_Minus));
     connect(_actZoomOut, SIGNAL(triggered()), SLOT(viewZoomOut()));
 
-    {
-    QIcon lockIcon;
-    lockIcon.addPixmap(QPixmap(":/icons/lock.png"), QIcon::Normal, QIcon::On);
-    lockIcon.addPixmap(QPixmap(":/icons/lock-open.png"), QIcon::Normal, QIcon::Off);
-    _actLockRegions = new QAction(lockIcon, "Lock Regions", this );
+    _actHideRegions = new QAction(
+                iconAltPixmap(":/icons/eye-blocked.png", ":/icons/eye.png"),
+                "Hide Regions", this );
+    _actHideRegions->setCheckable(true);
+    connect(_actHideRegions, SIGNAL(toggled(bool)), SLOT(hideRegions(bool)));
+
+    _actLockRegions = new QAction(
+                iconAltPixmap(":/icons/lock.png", ":/icons/lock-open.png"),
+                "Lock Regions", this );
     _actLockRegions->setCheckable(true);
     connect(_actLockRegions, SIGNAL(toggled(bool)), SLOT(lockRegions(bool)));
-    }
 }
 
 void AWindow::viewReset() { static_cast<AView*>(_view)->resetTransform(); }
@@ -245,6 +255,15 @@ void AWindow::viewReset() { static_cast<AView*>(_view)->resetTransform(); }
 void AWindow::viewZoomIn() { static_cast<AView*>(_view)->zoomIn(); }
 
 void AWindow::viewZoomOut() { static_cast<AView*>(_view)->zoomOut(); }
+
+void AWindow::hideRegions(bool hide)
+{
+    bool visible = ! hide;
+    each_item_mod(it) {
+        if (IS_REGION(it))
+            it->setVisible(visible);
+    }
+}
 
 void AWindow::lockRegions(bool lock)
 {
@@ -288,6 +307,7 @@ void AWindow::createMenus()
     view->addAction( _actViewReset );
     view->addAction( _actZoomIn );
     view->addAction( _actZoomOut );
+    view->addAction( _actHideRegions );
     view->addAction( _actLockRegions );
 
     QMenu* sett = bar->addMenu( "&Settings" );
@@ -319,6 +339,7 @@ void AWindow::createTools()
     _tools->addAction(_actRemove);
 
     _tools->addSeparator();
+    _tools->addAction(_actHideRegions);
     _tools->addAction(_actLockRegions);
 
     _tools->addSeparator();
