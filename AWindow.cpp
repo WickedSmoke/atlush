@@ -5,6 +5,7 @@
 //============================================================================
 
 
+#include <math.h>
 #include <QApplication>
 #include <QFileDialog>
 #include <QGraphicsPixmapItem>
@@ -695,6 +696,47 @@ void AWindow::execute(int pi, int push)
 }
 
 //----------------------------------------------------------------------------
+// Scene Classes
+
+static inline QPointF& pixelSnap(QPointF& pnt)
+{
+    pnt.setX( round(pnt.x()) );
+    pnt.setY( round(pnt.y()) );
+    return pnt;
+}
+
+class AImage : public QGraphicsPixmapItem
+{
+protected:
+     QVariant itemChange(GraphicsItemChange change, const QVariant& value)
+     {
+         if (change == ItemPositionChange) {
+             QPointF newPos = value.toPointF();
+             return pixelSnap(newPos);
+         }
+         return QGraphicsPixmapItem::itemChange(change, value);
+     }
+};
+
+class ARegion : public QGraphicsRectItem
+{
+public:
+    ARegion(QGraphicsItem* parent) : QGraphicsRectItem(parent)
+    {
+    }
+
+protected:
+     QVariant itemChange(GraphicsItemChange change, const QVariant& value)
+     {
+         if (change == ItemPositionChange) {
+             QPointF newPos = value.toPointF();
+             return pixelSnap(newPos);
+         }
+         return QGraphicsRectItem::itemChange(change, value);
+     }
+};
+
+//----------------------------------------------------------------------------
 // Project methods
 
 void AWindow::newProject()
@@ -704,11 +746,15 @@ void AWindow::newProject()
 
 QGraphicsPixmapItem* AWindow::makeImage(const QPixmap& pix, int x, int y)
 {
-    QGraphicsPixmapItem* item = _scene->addPixmap(pix);
+    QGraphicsPixmapItem* item = new AImage;
+    item->setPixmap(pix);
     item->setFlags(QGraphicsItem::ItemIsMovable |
-                   QGraphicsItem::ItemIsSelectable);
+                   QGraphicsItem::ItemIsSelectable |
+                   QGraphicsItem::ItemSendsGeometryChanges);
     item->setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
     item->setPos(x, y);
+
+    _scene->addItem(item);
     return item;
 }
 
@@ -716,13 +762,15 @@ QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
                                        int w, int h)
 {
     QRectF rect(0.0, 0.0, w, h);
-    QGraphicsRectItem* item = new QGraphicsRectItem(rect, parent);
+    QGraphicsRectItem* item = new ARegion(parent);
 
+    item->setRect(rect);
     item->setPen(QPen(Qt::NoPen));
     item->setBrush(QColor(255, 20, 20));
     item->setOpacity(0.5);
     item->setFlags(QGraphicsItem::ItemIsMovable |
-                   QGraphicsItem::ItemIsSelectable);
+                   QGraphicsItem::ItemIsSelectable |
+                   QGraphicsItem::ItemSendsGeometryChanges);
     item->setPos(x, y);
 
     //QPointF p = item->scenePos();
