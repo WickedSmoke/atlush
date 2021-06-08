@@ -27,6 +27,7 @@ public:
     AWindow();
 
     bool openFile(const QString& file);
+    bool directoryImport(const QString& path);
 
 public slots:
 
@@ -42,6 +43,7 @@ private slots:
     void openRecent();
     void save();
     void saveAs();
+    void importDir();
     void addImage();
     void addRegion();
     void removeSelected();
@@ -71,6 +73,7 @@ private:
     void createMenus();
     void createTools();
     void updateProjectName(const QString& path);
+    QGraphicsPixmapItem* importImage(const QString& file);
     QGraphicsPixmapItem* makeImage(const QPixmap&, int x, int y);
     QGraphicsRectItem* makeRegion(QGraphicsItem* parent, int, int, int, int);
     bool loadProject(const QString& path, int* errorLine);

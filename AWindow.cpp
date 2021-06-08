@@ -266,6 +266,7 @@ void AWindow::createMenus()
     file->addAction( _actOpen );
     file->addAction( _actSave );
     file->addAction( _actSaveAs );
+    file->addAction("Import &Directory...", this, SLOT(importDir()));
     file->addSeparator();
     _recent.install(file, this, SLOT(openRecent()));
     file->addSeparator();
@@ -439,6 +440,42 @@ void AWindow::saveAs()
     }
 }
 
+QGraphicsPixmapItem* AWindow::importImage(const QString& file)
+{
+    QPixmap pix(file);
+    if (pix.isNull())
+        return NULL;
+
+    QGraphicsPixmapItem* item = makeImage(pix, 0, 0);
+    item->setData(ID_NAME, file);
+    return item;
+}
+
+bool AWindow::directoryImport(const QString& path)
+{
+    QDir dir(path);
+    dir.setNameFilters(QStringList() << "*.png" << "*.jpg" << "*.jpeg");
+    const QStringList list = dir.entryList();
+    bool ok = true;
+
+    for (const QString& s: list) {
+        if (! importImage(dir.filePath(s)))
+            ok = false;
+    }
+    return ok;
+}
+
+void AWindow::importDir()
+{
+    QString fn = QFileDialog::getExistingDirectory(this,
+                            "Import Images from Directory", _prevImagePath);
+    if (! fn.isEmpty()) {
+        _prevImagePath = fn;
+        if (! directoryImport(fn))
+            QMessageBox::warning(this, "Import Failure",
+                                 "Some images could not be loaded!");
+    }
+}
 
 void AWindow::addImage()
 {
@@ -447,12 +484,7 @@ void AWindow::addImage()
     fn = QFileDialog::getOpenFileName(this, "Add Image", _prevImagePath);
     if( ! fn.isEmpty() ) {
         _prevImagePath = fn;
-
-        QPixmap pix(fn);
-        if (! pix.isNull()) {
-            QGraphicsItem* item = makeImage(pix, 0, 0);
-            item->setData(ID_NAME, fn);
-        }
+        importImage(fn);
     }
 }
 
@@ -861,8 +893,13 @@ int main( int argc, char **argv )
     AWindow w;
     w.show();
 
-    if (argc > 1)
-        w.openFile(argv[1]);
+    if (argc > 1) {
+        QFileInfo info(argv[1]);
+        if (info.isDir())
+            w.directoryImport(info.filePath());
+        else
+            w.openFile(info.filePath());
+    }
 
     return app.exec();
 }
