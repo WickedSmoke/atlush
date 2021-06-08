@@ -374,8 +374,6 @@ void AWindow::updateProjectName(const QString& path)
     setWindowTitle(title);
 }
 
-#define BG_Z    -1.0
-
 static void setupBackground(QGraphicsScene* scene, const QSize& size,
                             const QBrush& brush)
 {
@@ -658,7 +656,7 @@ void AWindow::editDocSize()
 void AWindow::canvasChanged()
 {
     each_item(it) {
-        if (it->type() == GIT_RECT && it->zValue() == BG_Z) {
+        if (IS_CANVAS(it)) {
             QGraphicsRectItem* rit = (QGraphicsRectItem*) it;
             QRectF rect(rit->rect());
             rect.setWidth(_docSize.width());

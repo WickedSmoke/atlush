@@ -5,7 +5,9 @@
 #define GIT_PIXMAP  QGraphicsPixmapItem::Type
 #define GIT_RECT    QGraphicsRectItem::Type
 
+#define BG_Z        -1.0
 #define IS_REGION(gi)   (gi->type() == GIT_RECT && gi->zValue() >= 0.0)
+#define IS_CANVAS(gi)   (gi->type() == GIT_RECT && gi->zValue() == BG_Z)
 
 // QGraphicsItem::data() key.
 enum ItemDataKey {
