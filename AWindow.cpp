@@ -132,6 +132,7 @@ AWindow::AWindow()
 
     QSettings settings;
     resize(settings.value("window-size", QSize(480, 480)).toSize());
+    restoreState(settings.value("window-state").toByteArray());
     _prevProjPath  = settings.value("prev-project").toString();
     _prevImagePath = settings.value("prev-image").toString();
     _ioSpec = settings.value("io-pipelines").toString();
@@ -146,6 +147,7 @@ void AWindow::closeEvent( QCloseEvent* ev )
 {
     QSettings settings;
     settings.setValue("window-size", size());
+    settings.setValue("window-state", saveState());
     settings.setValue("prev-project", _prevProjPath);
     settings.setValue("prev-image", _prevImagePath);
     settings.setValue("io-pipelines", _ioSpec);
@@ -338,6 +340,7 @@ QSpinBox* makeSpinBox()
 void AWindow::createTools()
 {
     _tools = addToolBar("");
+    _tools->setObjectName("tools");
     _tools->addAction(_actOpen);
     _tools->addAction(_actSave);
 
@@ -352,6 +355,7 @@ void AWindow::createTools()
 
 
     _propBar = new QToolBar;
+    _propBar->setObjectName("propBar");
     _propBar->addWidget(_name = new QLineEdit);
     _propBar->addWidget(_spinX = makeSpinBox());
     _propBar->addWidget(_spinY = makeSpinBox());
@@ -372,6 +376,7 @@ void AWindow::createTools()
     _packPad->setRange(0,32);
 
     _packBar = new QToolBar;
+    _packBar->setObjectName("packBar");
     _packBar->addAction(_actPack);
     _packBar->addWidget(new QLabel("Pad:"));
     _packBar->addWidget(_packPad);
@@ -382,6 +387,7 @@ void AWindow::createTools()
     connect(_io, SIGNAL(execute(int,int)), SLOT(execute(int,int)));
 
     _ioBar = new QToolBar;
+    _ioBar->setObjectName("ioBar");
     _ioBar->addWidget(_io);
     addToolBar(Qt::BottomToolBarArea, _ioBar);
 }
