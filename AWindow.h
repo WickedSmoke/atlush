@@ -49,6 +49,7 @@ private slots:
     void viewReset();
     void viewZoomIn();
     void viewZoomOut();
+    void lockRegions(bool);
     void syncSelection();
     void newProject();
     void modName();
@@ -88,6 +89,7 @@ private:
     QAction* _actViewReset;
     QAction* _actZoomIn;
     QAction* _actZoomOut;
+    QAction* _actLockRegions;
 
     QToolBar* _tools;
     QLineEdit* _name;

@@ -228,6 +228,15 @@ void AWindow::createActions()
                               "Zoom &Out", this );
     _actZoomOut->setShortcut(QKeySequence(Qt::Key_Minus));
     connect(_actZoomOut, SIGNAL(triggered()), SLOT(viewZoomOut()));
+
+    {
+    QIcon lockIcon;
+    lockIcon.addPixmap(QPixmap(":/icons/lock.png"), QIcon::Normal, QIcon::On);
+    lockIcon.addPixmap(QPixmap(":/icons/lock-open.png"), QIcon::Normal, QIcon::Off);
+    _actLockRegions = new QAction(lockIcon, "Lock Regions", this );
+    _actLockRegions->setCheckable(true);
+    connect(_actLockRegions, SIGNAL(toggled(bool)), SLOT(lockRegions(bool)));
+    }
 }
 
 void AWindow::viewReset() { static_cast<AView*>(_view)->resetTransform(); }
@@ -236,6 +245,17 @@ void AWindow::viewZoomIn() { static_cast<AView*>(_view)->zoomIn(); }
 
 void AWindow::viewZoomOut() { static_cast<AView*>(_view)->zoomOut(); }
 
+void AWindow::lockRegions(bool lock)
+{
+    QGraphicsItem::GraphicsItemFlags flags;
+    if (! lock)
+        flags = QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable;
+
+    each_item_mod(it) {
+        if (IS_REGION(it))
+            it->setFlags(flags);
+    }
+}
 
 void AWindow::createMenus()
 {
@@ -266,6 +286,7 @@ void AWindow::createMenus()
     view->addAction( _actViewReset );
     view->addAction( _actZoomIn );
     view->addAction( _actZoomOut );
+    view->addAction( _actLockRegions );
 
     QMenu* sett = bar->addMenu( "&Settings" );
     sett->addAction("Configure &Pipelines...", this, SLOT(editPipelines()));
@@ -294,6 +315,9 @@ void AWindow::createTools()
     _tools->addAction(_actAddImage);
     _tools->addAction(_actAddRegion);
     _tools->addAction(_actRemove);
+
+    _tools->addSeparator();
+    _tools->addAction(_actLockRegions);
 
     _tools->addSeparator();
     _tools->addWidget(_name = new QLineEdit);
@@ -781,8 +805,6 @@ static int regionWriteBoron(FILE* fp, const ItemValues& iv) {
     return fprintf(fp, "\"%s\" %d,%d,%d,%d\n",
                    iv.name.constData(), iv.x, iv.y, iv.w, iv.h);
 }
-
-#define IS_REGION(gi)   (gi->type() == GIT_RECT && gi->zValue() >= 0.0)
 
 /*
  * Replace project file with items in scene.

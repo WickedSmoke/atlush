@@ -5,6 +5,8 @@
 #define GIT_PIXMAP  QGraphicsPixmapItem::Type
 #define GIT_RECT    QGraphicsRectItem::Type
 
+#define IS_REGION(gi)   (gi->type() == GIT_RECT && gi->zValue() >= 0.0)
+
 // QGraphicsItem::data() key.
 enum ItemDataKey {
     ID_NAME
@@ -21,3 +23,6 @@ typedef QList<QGraphicsItem*> ItemList;
 
 #define each_item(pi) \
     for(const QGraphicsItem* pi : _scene->items(Qt::AscendingOrder))
+
+#define each_item_mod(pi) \
+    for(QGraphicsItem* pi : _scene->items(Qt::AscendingOrder))
