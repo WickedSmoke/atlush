@@ -126,6 +126,7 @@ AWindow::AWindow()
     _view = new AView(_scene);
     _view->setMinimumSize(128, 128);
     _view->setBackgroundBrush(QBrush(Qt::darkGray));
+    _view->setDragMode(QGraphicsView::RubberBandDrag);
     setCentralWidget(_view);
 
     _bgPix = QPixmap(":/icons/transparent.png");

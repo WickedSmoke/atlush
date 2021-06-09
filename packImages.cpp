@@ -40,9 +40,15 @@ void AWindow::packImages()
     int leftover;
 
     // Collect images.
+    {
     ItemValues val;
     int pad = _packPad->value();
-    each_item(gi) {
+
+    QList<QGraphicsItem *> list = _scene->selectedItems();
+    if (list.empty())
+        list = _scene->items(Qt::AscendingOrder);
+
+    for(const QGraphicsItem* gi : list) {
         if (gi->type() != GIT_PIXMAP)
             continue;
         itemValues(val, gi);
@@ -52,6 +58,7 @@ void AWindow::packImages()
 
         pk.input += Content<APData>((QGraphicsItem*) gi,
                                 Coord(val.x, val.y), Size(val.w, val.h), false);
+    }
     }
 
     // Pack 'em.
@@ -82,9 +89,15 @@ void AWindow::extractRegionsOp(const QString& file, const QColor& color)
 
 
     // Collect regions.
+    {
     ItemValues val;
     int pad = _packPad->value();
-    each_item(gi) {
+
+    QList<QGraphicsItem *> list = _scene->selectedItems();
+    if (list.empty())
+        list = _scene->items(Qt::AscendingOrder);
+
+    for(const QGraphicsItem* gi : list) {
         if (! IS_REGION(gi))
             continue;
         itemValues(val, gi);
@@ -94,6 +107,7 @@ void AWindow::extractRegionsOp(const QString& file, const QColor& color)
 
         pk.input += Content<APData>((QGraphicsItem*) gi,
                                 Coord(val.x, val.y), Size(val.w, val.h), false);
+    }
     }
 
     if (pk.input.Get().empty()) {
