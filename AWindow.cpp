@@ -362,8 +362,8 @@ void AWindow::createTools()
     _propBar->addWidget(_name = new QLineEdit);
     _propBar->addWidget(_spinX = makeSpinBox());
     _propBar->addWidget(_spinY = makeSpinBox());
-    _propBar->addWidget(_spinH = makeSpinBox());
     _propBar->addWidget(_spinW = makeSpinBox());
+    _propBar->addWidget(_spinH = makeSpinBox());
     addToolBar(Qt::TopToolBarArea, _propBar);
 
     _name->setEnabled(false);
