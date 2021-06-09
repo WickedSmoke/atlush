@@ -53,6 +53,7 @@ private slots:
 
 private:
     QComboBox* _pipeline;
+    QLineEdit* _name;
     QLineEdit* _cmdIn;
     QLineEdit* _cmdOut;
     QStringList _spec;

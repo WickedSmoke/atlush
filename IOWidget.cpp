@@ -4,7 +4,6 @@
 #include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QInputDialog>
 #include <QPushButton>
 #include <QToolButton>
 #include "IOWidget.h"
@@ -75,6 +74,9 @@ IODialog::IODialog(QWidget* parent) : QDialog(parent)
     connect(_pipeline, SIGNAL(currentIndexChanged(int)),
             SLOT(pipelineChanged(int)));
 
+    _name = new QLineEdit;
+    connect(_name, SIGNAL(editingFinished()), SLOT(cmdChanged()));
+
     _cmdIn = new QLineEdit;
     connect(_cmdIn, SIGNAL(editingFinished()), SLOT(cmdChanged()));
 
@@ -98,6 +100,7 @@ IODialog::IODialog(QWidget* parent) : QDialog(parent)
      hl->addWidget(_pipeline);
 
      QFormLayout* form = new QFormLayout;
+      form->addRow(tr("Name:"), _name);
       form->addRow(tr("Import Command:"), _cmdIn);
       form->addRow(tr("Export Command:"), _cmdOut);
 
@@ -141,6 +144,7 @@ void IODialog::pipelineChanged(int n)
 {
     if (n >= 0) {
         n *= SPEC_SIZE;
+        _name  ->setText(_spec[n + SPEC_NAME]);
         _cmdIn ->setText(_spec[n + SPEC_IMPORT]);
         _cmdOut->setText(_spec[n + SPEC_EXPORT]);
     }
@@ -148,18 +152,17 @@ void IODialog::pipelineChanged(int n)
 
 void IODialog::addPipeline()
 {
-     bool ok;
-     QString name = QInputDialog::getText(this, tr("New Pipeline"),
-                                          tr("Name:"), QLineEdit::Normal,
-                                          "<unnamed>", &ok);
-     if (ok && ! name.isEmpty()) {
-         _spec.append(name);
-         _spec.append("to-atlush input $ATL");
-         _spec.append("from-atlush $ATL output");
+    QString name("<unnamed>");
 
-         _pipeline->addItem(name);
-         _pipeline->setCurrentIndex(_pipeline->count() - 1);
-     }
+    _spec.append(name);
+    _spec.append("to-atlush input $ATL");
+    _spec.append("from-atlush $ATL output");
+
+    _pipeline->addItem(name);
+    _pipeline->setCurrentIndex(_pipeline->count() - 1);
+
+    _name->selectAll();
+    _name->setFocus(Qt::OtherFocusReason);
 }
 
 void IODialog::removePipeline()
@@ -187,11 +190,16 @@ void IODialog::cmdChanged()
 {
     int n = _pipeline->currentIndex();
     if (n >= 0) {
-        n *= SPEC_SIZE;
-        if (sender() == _cmdIn)
-            _spec[n + SPEC_IMPORT] = _cmdIn->text();
+        int si = n * SPEC_SIZE;
+        QObject* obj = sender();
+        if (obj == _name) {
+            QString name(_name->text());
+            _spec[si + SPEC_NAME] = name;
+            _pipeline->setItemText(n, name);
+        } else if (obj == _cmdIn)
+            _spec[si + SPEC_IMPORT] = _cmdIn->text();
         else
-            _spec[n + SPEC_EXPORT] = _cmdOut->text();
+            _spec[si + SPEC_EXPORT] = _cmdOut->text();
     }
 }
 
