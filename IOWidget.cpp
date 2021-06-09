@@ -20,10 +20,10 @@ IOWidget::IOWidget()
 {
     _pipeline = new QComboBox;
 
-    _in = new QPushButton(QString::fromUtf8("\xe2\x87\x92 Import"));
+    _in = new QPushButton(QString::fromUtf8("\xc2\xbb Import"));
     connect(_in, SIGNAL(clicked(bool)), SLOT(emitExec()));
 
-    _out = new QPushButton(QString::fromUtf8("Export \xe2\x87\x92"));
+    _out = new QPushButton(QString::fromUtf8("Export \xc2\xbb"));
     connect(_out, SIGNAL(clicked(bool)), SLOT(emitExec()));
 
     QBoxLayout* lo = new QHBoxLayout(this);
