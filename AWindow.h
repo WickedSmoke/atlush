@@ -44,6 +44,7 @@ private slots:
     void save();
     void saveAs();
     void importDir();
+    void exportImage();
     void addImage();
     void addRegion();
     void removeSelected();
@@ -76,6 +77,7 @@ private:
     void createMenus();
     void createTools();
     void updateProjectName(const QString& path);
+    bool exportAtlasImage(const QString& path, int w, int h);
     QGraphicsPixmapItem* importImage(const QString& file);
     QGraphicsPixmapItem* makeImage(const QPixmap&, int x, int y);
     QGraphicsRectItem* makeRegion(QGraphicsItem* parent, int, int, int, int);

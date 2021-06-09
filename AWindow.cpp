@@ -298,6 +298,7 @@ void AWindow::createMenus()
     file->addAction( _actSave );
     file->addAction( _actSaveAs );
     file->addAction("Import &Directory...", this, SLOT(importDir()));
+    file->addAction("Export &Image...", this, SLOT(exportImage()));
     file->addSeparator();
     _recent.install(file, this, SLOT(openRecent()));
     file->addSeparator();
@@ -523,6 +524,57 @@ void AWindow::importDir()
         if (! directoryImport(fn))
             QMessageBox::warning(this, "Import Failure",
                                  "Some images could not be loaded!");
+    }
+}
+
+bool AWindow::exportAtlasImage(const QString& path, int w, int h)
+{
+    QPixmap newPix(w, h);
+    QPainter ip;
+
+    newPix.fill(QColor(0,0,0,0));
+    ip.begin(&newPix);
+    each_item(gi) {
+        if (IS_IMAGE(gi)) {
+            QPointF pos = gi->pos();
+            ip.drawPixmap(pos.x(), pos.y(),
+                      static_cast<const QGraphicsPixmapItem*>(gi)->pixmap());
+        }
+    }
+    ip.end();
+
+    if (! newPix.save(path)) {
+        QString error("Could not save image to file ");
+        QMessageBox::critical(this, "Export Image", error + path);
+        return false;
+    }
+
+    return true;
+}
+
+void AWindow::exportImage()
+{
+    int w, h;
+    QRectF rect = _scene->itemsBoundingRect();
+    if (rect.isEmpty()) {
+        QMessageBox::warning(this, "Export Image",
+                         "No Images found; nothing to export.");
+        return;
+    }
+
+    if (_docSize.isEmpty()) {
+        w = rect.width() - 1;
+        h = rect.height() - 1;
+    } else {
+        w = _docSize.width();
+        h = _docSize.height();
+    }
+
+    QString fn = QFileDialog::getSaveFileName(this, "Export Atlas Image",
+                                              _prevImagePath);
+    if (! fn.isEmpty()) {
+        _prevImagePath = fn;
+        exportAtlasImage(fn, w, h);
     }
 }
 
