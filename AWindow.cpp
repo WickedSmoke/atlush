@@ -314,7 +314,8 @@ void AWindow::createMenus()
     edit->addAction( _actPack );
     edit->addAction("Merge Images...", this, SLOT(mergeImages()),
                     QKeySequence(Qt::CTRL + Qt::Key_M));
-    edit->addAction("Extract Regions...", this, SLOT(extractRegions()));
+    edit->addAction("Extract Regions...", this, SLOT(extractRegions()),
+                    QKeySequence(Qt::CTRL + Qt::Key_E));
     edit->addSeparator();
     edit->addAction("Canvas &Size...", this, SLOT(editDocSize()));
 
