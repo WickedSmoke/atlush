@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QFileDialog>
 #include <QGraphicsPixmapItem>
+#include <QGraphicsSceneMouseEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -705,19 +706,25 @@ void AWindow::undo()
 // Set QSpinBox value without emitting the valueChanged() signal.
 static void assignSpin(QSpinBox* spin, int val)
 {
-    spin->blockSignals(true);
-    spin->setValue(val);
-    spin->blockSignals(false);
+    if (val != spin->value()) {
+        spin->blockSignals(true);
+        spin->setValue(val);
+        spin->blockSignals(false);
+    }
 }
 
 void AWindow::sceneChange()
 {
     if (_selItem) {
         QPoint pos = _selItem->scenePos().toPoint();
-        if (pos.x() != _spinX->value())
-            assignSpin(_spinX, pos.x());
-        if (pos.y() != _spinY->value())
-            assignSpin(_spinY, pos.y());
+        assignSpin(_spinX, pos.x());
+        assignSpin(_spinY, pos.y());
+
+        if (IS_REGION(_selItem)) {
+            QRectF br = static_cast<QGraphicsRectItem *>(_selItem)->rect();
+            assignSpin(_spinW, br.width());
+            assignSpin(_spinH, br.height());
+        }
     }
 }
 
@@ -891,6 +898,8 @@ void AWindow::execute(int pi, int push)
 //----------------------------------------------------------------------------
 // Scene Classes
 
+#define HANDLE_SIZE     5
+
 static inline QPointF& pixelSnap(QPointF& pnt)
 {
     pnt.setX( round(pnt.x()) );
@@ -919,14 +928,108 @@ public:
     }
 
 protected:
-     QVariant itemChange(GraphicsItemChange change, const QVariant& value)
-     {
-         if (change == ItemPositionChange) {
-             QPointF newPos = value.toPointF();
-             return pixelSnap(newPos);
-         }
-         return QGraphicsRectItem::itemChange(change, value);
-     }
+    QVariant itemChange(GraphicsItemChange change, const QVariant& value)
+    {
+        if (change == ItemPositionChange) {
+            QPointF newPos = value.toPointF();
+            return pixelSnap(newPos);
+        }
+        return QGraphicsRectItem::itemChange(change, value);
+    }
+
+    void mouseMoveEvent(QGraphicsSceneMouseEvent* ev)
+    {
+        QPointF delta = ev->scenePos() - ev->buttonDownScenePos(Qt::LeftButton);
+        switch(_activeHandle) {
+            case 1:
+                setPos(_resizePos + delta);
+                pixelSnapDim(_resizeW - delta.x(), _resizeH - delta.y());
+                break;
+            case 2:
+                setPos(_resizePos.x(), _resizePos.y() + delta.y());
+                pixelSnapDim(_resizeW + delta.x(), _resizeH - delta.y());
+                break;
+            case 3:
+                setPos(_resizePos.x() + delta.x(), _resizePos.y());
+                pixelSnapDim(_resizeW - delta.x(), _resizeH + delta.y());
+                break;
+            case 4:
+                pixelSnapDim(_resizeW + delta.x(), _resizeH + delta.y());
+                break;
+            default:
+                QGraphicsRectItem::mouseMoveEvent(ev);
+                break;
+        }
+    }
+
+    void mousePressEvent(QGraphicsSceneMouseEvent* ev)
+    {
+        static const Qt::CursorShape dragCursor[5] = {
+            Qt::DragMoveCursor,
+            Qt::SizeFDiagCursor, Qt::SizeBDiagCursor,
+            Qt::SizeBDiagCursor, Qt::SizeFDiagCursor
+            // Qt::SizeVerCursor, Qt::SizeHorCursor
+        };
+        if (ev->button() == Qt::LeftButton) {
+            _activeHandle = handleAt(ev->pos());
+            if (_activeHandle) {
+                QRectF br = rect();
+                _resizeW = br.width();
+                _resizeH = br.height();
+                _resizePos = pos();
+            }
+            setCursor(dragCursor[_activeHandle]);
+        }
+        QGraphicsRectItem::mousePressEvent(ev);
+    }
+
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent* ev)
+    {
+        if (ev->button() == Qt::LeftButton) {
+            _activeHandle = 0;
+            setCursor(Qt::ArrowCursor);
+        }
+        QGraphicsRectItem::mouseReleaseEvent(ev);
+    }
+
+private:
+    void pixelSnapDim(qreal w, qreal h)
+    {
+        QPointF dim(w , h);
+        pixelSnap(dim);
+        if (dim.x() < 1.0)
+            dim.setX(1.0);
+        if (dim.y() < 1.0)
+            dim.setY(1.0);
+        setRect(0, 0, dim.x(), dim.y());
+    }
+
+    int handleAt(const QPointF& pos)
+    {
+        QRectF br = rect();
+        int h;
+
+        if (br.width() <= HANDLE_SIZE || br.height() <= HANDLE_SIZE)
+            return 4;
+
+        if (pos.y() < br.top() + HANDLE_SIZE)
+            h = 1;
+        else if (pos.y() > br.bottom() - HANDLE_SIZE)
+            h = 3;
+        else
+            return 0;
+
+        if (pos.x() < br.left() + HANDLE_SIZE)      // 1---2
+            return h;                               // |   |
+        if (pos.x() > br.right() - HANDLE_SIZE)     // 3---4
+            return h + 1;
+        return 0;
+    }
+
+    QPointF _resizePos;
+    qreal _resizeW;
+    qreal _resizeH;
+    int _activeHandle;
 };
 
 //----------------------------------------------------------------------------
