@@ -312,6 +312,8 @@ void AWindow::createMenus()
     edit->addAction( _actRemove );
     edit->addSeparator();
     edit->addAction( _actPack );
+    edit->addAction("Merge Images...", this, SLOT(mergeImages()),
+                    QKeySequence(Qt::CTRL + Qt::Key_M));
     edit->addAction("Extract Regions...", this, SLOT(extractRegions()));
     edit->addSeparator();
     edit->addAction("Canvas &Size...", this, SLOT(editDocSize()));
@@ -575,6 +577,86 @@ void AWindow::exportImage()
     if (! fn.isEmpty()) {
         _prevImagePath = fn;
         exportAtlasImage(fn, w, h);
+    }
+}
+
+void AWindow::mergeImages()
+{
+    int w, h;
+
+    {
+    QRectF rect = _scene->itemsBoundingRect();
+    if (rect.isEmpty()) {
+        QMessageBox::warning(this, "Merge Images",
+                         "No Images found; nothing to merge.");
+        return;
+    }
+    w = rect.width() - 1;
+    h = rect.height() - 1;
+    }
+
+    QString file = QFileDialog::getSaveFileName(this, "Merged Image",
+                                                _prevImagePath);
+    if (file.isEmpty())
+        return;
+    _prevImagePath = file;
+
+#if 1
+    QList<QGraphicsItem *> list = _scene->items(Qt::AscendingOrder);
+#else
+    QList<QGraphicsItem *> list = _scene->selectedItems();
+    if (list.empty())
+        list = _scene->items(Qt::AscendingOrder);
+#endif
+
+    {
+    QVector<QGraphicsItem*> removeList;
+    QPixmap newPix(w, h);
+    QPainter ip;
+    QGraphicsItem* gi;
+    QGraphicsPixmapItem* pitem;
+
+    pitem = makeImage(QPixmap(), 0, 0);
+    pitem->setData(ID_NAME, file);
+
+    newPix.fill(QColor(0,0,0,0));
+    ip.begin(&newPix);
+    for(int i = 0; i < list.size(); ++i) {
+        gi = list.at(i);
+        if (IS_IMAGE(gi)) {
+            QPointF pos = gi->pos();
+            ip.drawPixmap(pos.x(), pos.y(),
+                      static_cast<const QGraphicsPixmapItem*>(gi)->pixmap());
+
+            if (removeList.indexOf(gi) < 0)
+                removeList.push_back(gi);
+        } else if(IS_REGION(gi)) {
+            // Transfer region to new image.
+            QPointF pos = gi->scenePos();
+            //pos -= pitem->scenePos();
+            gi->setParentItem(pitem);
+            gi->setPos(pos);
+        }
+    }
+    ip.end();
+    pitem->setPixmap(newPix);
+
+    removeItems(removeList.constData(), removeList.size());
+
+    if (! newPix.save(file)) {
+        QString error("Could not save image to file ");
+        QMessageBox::critical(this, "Merge Images", error + file);
+    }
+    }
+}
+
+void AWindow::removeItems(QGraphicsItem* const* list, int count)
+{
+    QGraphicsItem* item;
+    for (int i = 0; i < count; ++i) {
+        item = list[i];
+        _scene->removeItem(item);
+        delete item;
     }
 }
 

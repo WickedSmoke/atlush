@@ -64,6 +64,7 @@ private slots:
     void modW(int);
     void modH(int);
     void packImages();
+    void mergeImages();
     void extractRegions();
     void editDocSize();
     void canvasChanged();
@@ -78,6 +79,7 @@ private:
     void createTools();
     void updateProjectName(const QString& path);
     bool exportAtlasImage(const QString& path, int w, int h);
+    void removeItems(QGraphicsItem* const* list, int count);
     QGraphicsPixmapItem* importImage(const QString& file);
     QGraphicsPixmapItem* makeImage(const QPixmap&, int x, int y);
     QGraphicsRectItem* makeRegion(QGraphicsItem* parent, int, int, int, int);

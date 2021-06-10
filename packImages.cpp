@@ -128,7 +128,7 @@ void AWindow::extractRegionsOp(const QString& file, const QColor& color)
     // Create a new image and update the scene.
     {
     QVector<QGraphicsItem*> removeList;
-    QPixmap newPix(w, h);  // QImage::Format_ARGB32);
+    QPixmap newPix(w, h);
     QPainter ip;
     QRect srcRect;
     ABinPackIter it;
@@ -167,11 +167,7 @@ void AWindow::extractRegionsOp(const QString& file, const QColor& color)
     pitem->setPixmap(newPix);
 
     // Delete source images from scene.
-    for (int i = 0; i < removeList.size(); ++i) {
-        si = removeList.at(i);
-        _scene->removeItem(si);
-        delete si;
-    }
+    removeItems(removeList.constData(), removeList.size());
 
     if (! newPix.save(file)) {
         QString error("Could not save image to file ");
