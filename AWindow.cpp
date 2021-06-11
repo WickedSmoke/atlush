@@ -890,7 +890,11 @@ void AWindow::execute(int pi, int push)
 {
     char fileVar[40];
     sprintf(fileVar, "/tmp/atlush-%lld.atl", qApp->applicationPid());
+#ifdef _WIN32
+    _putenv_s("ATL", fileVar);
+#else
     setenv("ATL", fileVar, 1);
+#endif
 
     QString fn(fileVar);
     if (push) {
