@@ -257,6 +257,13 @@ void AWindow::createActions()
     _actLockRegions->setCheckable(true);
     connect(_actLockRegions, SIGNAL(toggled(bool)), SLOT(lockRegions(bool)));
 
+    _actLockImages = new QAction(
+                iconAltPixmap(":/icons/lock-image.png",
+                              ":/icons/lock-image-open.png"),
+                "Lock Images", this );
+    _actLockImages->setCheckable(true);
+    connect(_actLockImages, SIGNAL(toggled(bool)), SLOT(lockImages(bool)));
+
     _actPack = new QAction(QIcon(":/icons/pack.png"),
                            "&Pack Images", this );
     connect(_actPack, SIGNAL(triggered()), SLOT(packImages()));
@@ -285,6 +292,18 @@ void AWindow::lockRegions(bool lock)
 
     each_item_mod(it) {
         if (IS_REGION(it))
+            it->setFlags(flags);
+    }
+}
+
+void AWindow::lockImages(bool lock)
+{
+    QGraphicsItem::GraphicsItemFlags flags;
+    if (! lock)
+        flags = QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable;
+
+    each_item_mod(it) {
+        if (IS_IMAGE(it))
             it->setFlags(flags);
     }
 }
@@ -326,6 +345,7 @@ void AWindow::createMenus()
     view->addAction( _actZoomOut );
     view->addAction( _actHideRegions );
     view->addAction( _actLockRegions );
+    view->addAction( _actLockImages );
 
     QMenu* sett = bar->addMenu( "&Settings" );
     sett->addAction("Configure &Pipelines...", this, SLOT(editPipelines()));
@@ -359,6 +379,7 @@ void AWindow::createTools()
     _tools->addSeparator();
     _tools->addAction(_actHideRegions);
     _tools->addAction(_actLockRegions);
+    _tools->addAction(_actLockImages);
 
 
     _propBar = new QToolBar;

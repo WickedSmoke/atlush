@@ -54,6 +54,7 @@ private slots:
     void viewZoomOut();
     void hideRegions(bool);
     void lockRegions(bool);
+    void lockImages(bool);
     void sceneChange();
     void syncSelection();
     void newProject();
@@ -102,6 +103,7 @@ private:
     QAction* _actZoomOut;
     QAction* _actHideRegions;
     QAction* _actLockRegions;
+    QAction* _actLockImages;
     QAction* _actPack;
 
     QToolBar* _tools;
