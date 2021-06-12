@@ -70,6 +70,7 @@ private slots:
     void packImages();
     void mergeImages();
     void extractRegions();
+    void convertToImage();
     void editDocSize();
     void canvasChanged();
     void editPipelines();

@@ -362,6 +362,8 @@ void AWindow::createMenus()
                     QKeySequence(Qt::CTRL + Qt::Key_M));
     edit->addAction("Extract Regions...", this, SLOT(extractRegions()),
                     QKeySequence(Qt::CTRL + Qt::Key_E));
+    edit->addAction("Regions to Images...", this, SLOT(convertToImage()),
+                    QKeySequence(Qt::CTRL + Qt::Key_I));
     edit->addSeparator();
     edit->addAction("Canvas &Size...", this, SLOT(editDocSize()));
 
@@ -708,6 +710,67 @@ void AWindow::mergeImages()
     if (! newPix.save(file)) {
         QString error("Could not save image to file ");
         QMessageBox::critical(this, "Merge Images", error + file);
+    }
+    }
+}
+
+void AWindow::convertToImage()
+{
+    QString dir = QFileDialog::getExistingDirectory(this,
+                            "New Image Directory", _prevImagePath);
+    if (dir.isEmpty())
+        return;
+    _prevImagePath = dir;
+
+    if (dir.back() != '/')
+        dir.append('/');
+
+    ItemList list = _scene->selectedItems();
+    if (list.empty())
+        list = _scene->items(Qt::AscendingOrder);
+
+    {
+    QPainter ip;
+    QString file;
+    ItemValues val;
+    QPointF pos;
+    QGraphicsItem* gi;
+    QGraphicsItem* si;
+    QGraphicsPixmapItem* pitem;
+
+    for(int i = 0; i < list.size(); ++i) {
+        gi = list.at(i);
+        if(IS_REGION(gi)) {
+            si = gi->parentItem();
+            if (si && IS_IMAGE(si)) {
+                itemValues(val, gi);
+                pos = gi->pos();
+
+                QPixmap newPix(val.w, val.h);
+                newPix.fill(QColor(0,0,0,0));
+                ip.begin(&newPix);
+                ip.drawPixmap(0, 0,
+                      static_cast<const QGraphicsPixmapItem*>(si)->pixmap(),
+                      int(pos.x()), int(pos.y()), val.w, val.h);
+                ip.end();
+
+                file = dir;
+                file.append(val.name);
+                file.append(".png");
+
+                if (newPix.save(file)) {
+                    // Replace region with new image.
+                    _scene->removeItem(gi);
+                    delete gi;
+
+                    pitem = makeImage(newPix, val.x, val.y);
+                    pitem->setData(ID_NAME, file);
+                } else {
+                    QString error("Could not save image to file ");
+                    QMessageBox::critical(this, "Convert Region", error + file);
+                }
+            }
+        }
     }
     }
 }
