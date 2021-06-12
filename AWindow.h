@@ -12,6 +12,7 @@
 #include "RecentFiles.h"
 
 
+class QCheckBox;
 class QLineEdit;
 class QSpinBox;
 class IOWidget;
@@ -123,6 +124,7 @@ private:
 
     QToolBar* _packBar;
     QSpinBox* _packPad;
+    QCheckBox* _packSort;
 
     QToolBar*  _searchBar;
     QLineEdit* _search;

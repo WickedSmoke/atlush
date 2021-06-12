@@ -1,3 +1,4 @@
+#include <QCheckBox>
 #include <QGraphicsItem>
 #include <QMessageBox>
 #include <QSpinBox>
@@ -16,11 +17,12 @@ struct GraphicsItemPacker {
     ContentAccumulator<APData> output;
     ContentAccumulator<APData> leftover;
 
-    int pack(int w, int h)
+    int pack(int w, int h, bool sort)
     {
         CanvasArray<APData> canvases =
             UniformCanvasArrayBuilder<APData>(w, h, 1).Build();
-        input.Sort();
+        if (sort)
+            input.Sort();
         canvases.Place(input, leftover);
         canvases.CollectContent(output);
         return leftover.Get().size();
@@ -68,7 +70,7 @@ void AWindow::packImages()
         w = _docSize.width();
         h = _docSize.height();
     }
-    leftover = pk.pack(w, h);
+    leftover = pk.pack(w, h, _packSort->isChecked());
 
     // Update scene.
     ABinPackIter it;
@@ -123,7 +125,7 @@ void AWindow::extractRegionsOp(const QString& file, const QColor& color)
         w = _docSize.width();
         h = _docSize.height();
     }
-    leftover = pk.pack(w, h);
+    leftover = pk.pack(w, h, _packSort->isChecked());
 
     // Create a new image and update the scene.
     {
