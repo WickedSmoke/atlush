@@ -1285,6 +1285,8 @@ QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
  */
 bool AWindow::loadProject(const QString& path, int* errorLine)
 {
+    QString imagePath;
+    QFileInfo info(path);
     FILE* fp = fopen(UTF8(path), "r");
     if (! fp) {
         *errorLine = -1;
@@ -1317,7 +1319,11 @@ add_item:
                     region->setData(ID_NAME, name);
                 }
             } else {
-                QPixmap pix(name);
+                if (QDir::isRelativePath(name))
+                    imagePath = info.path() + '/' + name;
+                else
+                    imagePath = name;
+                QPixmap pix(imagePath);
                 if (pix.isNull())
                     pix = QPixmap(":/icons/missing.png");
 
