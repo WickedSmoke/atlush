@@ -802,11 +802,26 @@ void AWindow::modName()
     }
 }
 
+static void highlightItem(QGraphicsItem* item, bool on)
+{
+    if (IS_REGION(item)) {
+        QRgb rgb = on ? qRgb(255, 255, 70) : qRgb(255, 20, 20);
+        static_cast<QGraphicsRectItem*>(item)->setBrush(QColor(rgb));
+    }
+}
+
 void AWindow::modSearch()
 {
     QString name;
     QString pattern = _search->text();
     QGraphicsItem* prev = NULL;
+
+    if (pattern.isEmpty()) {
+        each_item_mod(gi) {
+            highlightItem(gi, false);
+        }
+        return;
+    }
 
     _scene->blockSignals(true);
     each_item_mod(gi) {
@@ -817,18 +832,22 @@ void AWindow::modSearch()
         if (name.contains(pattern)) {
             if (! prev)
                 _scene->clearSelection();
-            else
+            else {
                 prev->setSelected(true);
+                highlightItem(prev, true);
+            }
             prev = gi;
-        }
+        } else
+            highlightItem(gi, false);
     }
     _scene->blockSignals(false);
 
     // Do the final selection change outside the loop now that signals are
     // enabled again.
-    if (prev)
+    if (prev) {
         prev->setSelected(true);
-    else
+        highlightItem(prev, true);
+    } else
         _scene->clearSelection();
 }
 
