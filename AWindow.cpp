@@ -27,6 +27,31 @@
 #include "ItemValues.h"
 
 
+#define EXT_COUNT   4
+static const char* imageExt[EXT_COUNT] = { ".png", ".jpeg", ".jpg", ".ppm" };
+
+QStringList imageFilters()
+{
+    QStringList list;
+    char wild[8];
+
+    wild[0] = '*';
+    for (int i = 0; i < EXT_COUNT; ++i) {
+        strcpy(wild + 1, imageExt[i]);
+        list << QString(wild);
+    }
+    return list;
+}
+
+bool hasImageExt(const QString& path)
+{
+    for (int i = 0; i < EXT_COUNT; ++i) {
+        if (path.endsWith(QLatin1String(imageExt[i]), Qt::CaseInsensitive))
+            return true;
+    }
+    return false;
+}
+
 void itemValues(ItemValues& iv, const QGraphicsItem* item)
 {
     iv.name = item->data(ID_NAME).toString().toUtf8();
@@ -539,7 +564,7 @@ QGraphicsPixmapItem* AWindow::importImage(const QString& file)
 bool AWindow::directoryImport(const QString& path)
 {
     QDir dir(path);
-    dir.setNameFilters(QStringList() << "*.png" << "*.jpg" << "*.jpeg");
+    dir.setNameFilters(imageFilters());
     const QStringList list = dir.entryList();
     bool ok = true;
 
@@ -1323,10 +1348,13 @@ int main( int argc, char **argv )
 
     if (argc > 1) {
         QFileInfo info(argv[1]);
+        QString path(info.filePath());
         if (info.isDir())
-            w.directoryImport(info.filePath());
+            w.directoryImport(path);
+        else if(hasImageExt(path))
+            w.importImage(path);
         else
-            w.openFile(info.filePath());
+            w.openFile(path);
     }
 
     return app.exec();
