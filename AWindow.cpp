@@ -813,9 +813,30 @@ void AWindow::addRegion()
 void AWindow::removeSelected()
 {
     ItemList sel = _scene->selectedItems();
-    if (! sel.empty()) {
+    if (sel.size() == 1) {
         _scene->removeItem(sel[0]);
         delete sel[0];
+    } else {
+        QVector<QGraphicsItem*> regList;
+        QVector<QGraphicsItem*> imgList;
+        QGraphicsItem* gi;
+        QGraphicsItem* pi;
+
+        // Sort items into region & image lists.
+        for(int i = 0; i < sel.size(); ++i) {
+            gi = sel.at(i);
+            if (IS_REGION(gi)) {
+                // If the parent is going away don't explicitly remove gi.
+                pi = gi->parentItem();
+                if (pi && pi->isSelected())
+                    continue;
+                regList.push_back(gi);
+            } else if (IS_IMAGE(gi))
+                imgList.push_back(gi);
+        }
+
+        removeItems(regList.constData(), regList.size());
+        removeItems(imgList.constData(), imgList.size());
     }
 }
 
