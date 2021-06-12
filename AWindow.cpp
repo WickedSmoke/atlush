@@ -484,6 +484,11 @@ bool AWindow::openFile(const QString& file)
 {
     _scene->clear();
 
+    // Reset lock/hide to match the default state of newly loaded items.
+    _actHideRegions->setChecked(false);
+    _actLockRegions->setChecked(false);
+    _actLockImages->setChecked(false);
+
     int line;
     if (loadProject(file, &line)) {
         updateProjectName(file);
