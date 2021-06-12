@@ -59,6 +59,7 @@ private slots:
     void syncSelection();
     void newProject();
     void modName();
+    void modSearch();
     void stringEdit();
     void modX(int);
     void modY(int);
@@ -122,6 +123,9 @@ private:
 
     QToolBar* _packBar;
     QSpinBox* _packPad;
+
+    QToolBar*  _searchBar;
+    QLineEdit* _search;
 
     QGraphicsScene* _scene;     // Stores our project.
     QGraphicsView* _view;

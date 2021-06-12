@@ -418,6 +418,16 @@ void AWindow::createTools()
     _ioBar->setObjectName("ioBar");
     _ioBar->addWidget(_io);
     addToolBar(Qt::BottomToolBarArea, _ioBar);
+
+
+    _search = new QLineEdit;
+    _search->setPlaceholderText("search");
+    connect(_search, SIGNAL(editingFinished()), SLOT(modSearch()));
+
+    _searchBar = new QToolBar;
+    _searchBar->setObjectName("searchBar");
+    _searchBar->addWidget(_search);
+    addToolBar(Qt::BottomToolBarArea, _searchBar);
 }
 
 void AWindow::updateProjectName(const QString& path)
@@ -790,6 +800,36 @@ void AWindow::modName()
         if (_selItem)
             _selItem->setData(ID_NAME, _name->text());
     }
+}
+
+void AWindow::modSearch()
+{
+    QString name;
+    QString pattern = _search->text();
+    QGraphicsItem* prev = NULL;
+
+    _scene->blockSignals(true);
+    each_item_mod(gi) {
+        if (IS_CANVAS(gi))
+            continue;
+
+        name = gi->data(ID_NAME).toString();
+        if (name.contains(pattern)) {
+            if (! prev)
+                _scene->clearSelection();
+            else
+                prev->setSelected(true);
+            prev = gi;
+        }
+    }
+    _scene->blockSignals(false);
+
+    // Do the final selection change outside the loop now that signals are
+    // enabled again.
+    if (prev)
+        prev->setSelected(true);
+    else
+        _scene->clearSelection();
 }
 
 // Record that a QLineEdit was edited.
