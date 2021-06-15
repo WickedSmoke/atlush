@@ -28,6 +28,8 @@
 #include "ItemValues.h"
 
 
+#define ITEM_PIXMAP(gi) static_cast<const QGraphicsPixmapItem*>(gi)->pixmap()
+
 #define EXT_COUNT   4
 static const char* imageExt[EXT_COUNT] = { ".png", ".jpeg", ".jpg", ".ppm" };
 
@@ -364,6 +366,7 @@ void AWindow::createMenus()
                     QKeySequence(Qt::CTRL + Qt::Key_E));
     edit->addAction("Regions to Images...", this, SLOT(convertToImage()),
                     QKeySequence(Qt::CTRL + Qt::Key_I));
+    edit->addAction("Crop Images...", this, SLOT(cropImages()));
     edit->addSeparator();
     edit->addAction("Canvas &Size...", this, SLOT(editDocSize()));
 
@@ -608,8 +611,7 @@ bool AWindow::exportAtlasImage(const QString& path, int w, int h)
     each_item(gi) {
         if (IS_IMAGE(gi)) {
             QPointF pos = gi->pos();
-            ip.drawPixmap(pos.x(), pos.y(),
-                      static_cast<const QGraphicsPixmapItem*>(gi)->pixmap());
+            ip.drawPixmap(pos.x(), pos.y(), ITEM_PIXMAP(gi));
         }
     }
     ip.end();
@@ -694,8 +696,7 @@ void AWindow::mergeImages()
         gi = list.at(i);
         if (IS_IMAGE(gi)) {
             QPointF pos = gi->pos();
-            ip.drawPixmap(pos.x(), pos.y(),
-                      static_cast<const QGraphicsPixmapItem*>(gi)->pixmap());
+            ip.drawPixmap(pos.x(), pos.y(), ITEM_PIXMAP(gi));
 
             if (removeList.indexOf(gi) < 0)
                 removeList.push_back(gi);
@@ -754,9 +755,8 @@ void AWindow::convertToImage()
                 QPixmap newPix(val.w, val.h);
                 newPix.fill(QColor(0,0,0,0));
                 ip.begin(&newPix);
-                ip.drawPixmap(0, 0,
-                      static_cast<const QGraphicsPixmapItem*>(si)->pixmap(),
-                      int(pos.x()), int(pos.y()), val.w, val.h);
+                ip.drawPixmap(0, 0, ITEM_PIXMAP(si),
+                              int(pos.x()), int(pos.y()), val.w, val.h);
                 ip.end();
 
                 file = dir;
@@ -773,6 +773,153 @@ void AWindow::convertToImage()
                 } else {
                     QString error("Could not save image to file ");
                     QMessageBox::critical(this, "Convert Region", error + file);
+                }
+            }
+        }
+    }
+    }
+}
+
+static int testRowAlpha(QImage& img, int y, int w) {
+    QRgb rgb;
+    int x;
+    for (x = 0; x < w; ++x) {
+        rgb = img.pixel(x, y);
+        if (qAlpha(rgb) != 0)
+            return x;
+    }
+    return x;
+}
+
+static int testRowAlphaEnd(QImage& img, int y, int w) {
+    QRgb rgb;
+    int x;
+    for (x = w - 1; x > 0; --x) {
+        rgb = img.pixel(x, y);
+        if (qAlpha(rgb) != 0)
+            return x;
+    }
+    return x;
+}
+
+static bool cropAlpha(QImage& img, QRect& rect)
+{
+    if (! img.hasAlphaChannel() || img.isNull())
+        return false;
+
+    int x = 0;
+    int y, r;
+    int lx, hx;
+    int w = img.width();
+    int h = img.height();
+
+    for (y = 0; y < h; ++y) {
+        x = testRowAlpha(img, y, w);
+        if (x < w)
+            break;
+    }
+    if (y == h)
+        return false;   // Completely empty.
+    lx = x;
+
+    for (--h; h > y; --h) {
+        x = testRowAlpha(img, h, w);
+        if (x < w)
+            break;
+    }
+    if (y == 0 && h == (img.height() - 1))
+        return false;
+    if (x < lx)
+        lx = x;
+
+    // Find minimum X.
+    if (lx > 0) {
+        for (r = y+1; r < h; ++r) {
+            x = testRowAlpha(img, r, w);
+            if (x < lx) {
+                lx = x;
+                if (lx == 0)
+                    break;
+            }
+        }
+    }
+
+    // Find maximum X.
+    hx = 0;
+    for (r = y; r <= h; ++r) {
+        x = testRowAlphaEnd(img, r, w);
+        if (x > hx) {
+            hx = x;
+            if (hx == w-1)
+                break;
+        }
+    }
+
+    rect.setCoords(lx, y, hx, h);
+    return true;
+}
+
+static void translateChildren(QGraphicsItem* item, QPointF& delta)
+{
+    ItemList list = item->childItems();
+    QGraphicsItem* gi;
+    for(int i = 0; i < list.size(); ++i) {
+        gi = list.at(i);
+        gi->setPos(gi->pos() - delta);
+    }
+}
+
+void AWindow::cropImages()
+{
+    QString dir = QFileDialog::getExistingDirectory(this,
+                            "New Image Directory", _prevImagePath);
+    if (dir.isEmpty())
+        return;
+    _prevImagePath = dir;
+
+    if (dir.back() != '/')
+        dir.append('/');
+
+    ItemList list = _scene->selectedItems();
+    if (list.empty())
+        list = _scene->items(Qt::AscendingOrder);
+
+    {
+    QPainter ip;
+    QString file;
+    ItemValues val;
+    QGraphicsItem* gi;
+    QRect rect;
+
+    for(int i = 0; i < list.size(); ++i) {
+        gi = list.at(i);
+        if(IS_IMAGE(gi)) {
+            itemValues(val, gi);
+
+            QImage img = ITEM_PIXMAP(gi).toImage();
+            if (cropAlpha(img, rect)) {
+                QPixmap newPix(rect.width(), rect.height());
+                newPix.fill(QColor(0,0,0,0));
+                ip.begin(&newPix);
+                ip.drawImage(QPoint(0, 0), img, rect);
+                ip.end();
+
+                QFileInfo info(val.name);
+                file = dir;
+                file.append(info.fileName());
+
+                if (newPix.save(file)) {
+                    // Replace pixmap and move to cropped pos.
+                    static_cast<QGraphicsPixmapItem*>(gi)->setPixmap(newPix);
+                    QPointF delta(rect.x(), rect.y());
+                    gi->setPos(gi->pos() + delta);
+                    gi->setData(ID_NAME, file);
+                    translateChildren(gi, delta);
+
+                    syncSelection();    // Update information in toolbar.
+                } else {
+                    QString error("Could not save image to file ");
+                    QMessageBox::critical(this, "Crop Images", error + file);
                 }
             }
         }

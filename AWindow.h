@@ -71,6 +71,7 @@ private slots:
     void mergeImages();
     void extractRegions();
     void convertToImage();
+    void cropImages();
     void editDocSize();
     void canvasChanged();
     void editPipelines();
