@@ -64,9 +64,10 @@ void AWindow::packImages()
     }
 
     // Pack 'em.
-    if (_docSize.isEmpty())
-        w = h = 1024;
-    else {
+    if (_docSize.isEmpty()) {
+        w = 1024;
+        h = 2048;
+    } else {
         w = _docSize.width();
         h = _docSize.height();
     }
@@ -119,9 +120,10 @@ void AWindow::extractRegionsOp(const QString& file, const QColor& color)
     }
 
     // Pack 'em.
-    if (_docSize.isEmpty())
-        w = h = 1024;
-    else {
+    if (_docSize.isEmpty()) {
+        w = 1024;
+        h = 2048;
+    } else {
         w = _docSize.width();
         h = _docSize.height();
     }

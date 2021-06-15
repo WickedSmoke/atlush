@@ -19,12 +19,13 @@ CanvasDialog::CanvasDialog(QWidget* parent)
 
     _preset = new QComboBox;
     _preset->addItem(tr("None"));
-    _preset->addItem(" 256, 256");
-    _preset->addItem(" 256, 512");
-    _preset->addItem(" 512, 512");
-    _preset->addItem(" 512,1024");
-    _preset->addItem("1024,1024");
-    _preset->addItem("2048,2048");
+    _preset->addItem(" 256 x 256");
+    _preset->addItem(" 256 x 512");
+    _preset->addItem(" 512 x 512");
+    _preset->addItem(" 512 x 1024");
+    _preset->addItem("1024 x 1024");
+    _preset->addItem("1024 x 2048");
+    _preset->addItem("2048 x 2048");
     connect(_preset, SIGNAL(currentIndexChanged(int)), SLOT(presetMod(int)));
 
     //_power2 = new QCheckBox(tr("Power of two"));
@@ -72,8 +73,13 @@ void CanvasDialog::updateData()
 
 void CanvasDialog::presetMod(int n)
 {
-    static const uint16_t presetW[] = { 0, 256, 256, 512, 512, 1024, 2048 };
-    static const uint16_t presetH[] = { 0, 256, 512, 512,1024, 1024, 2048 };
+    static const uint16_t presetW[] = {
+        0, 256, 256, 512, 512, 1024, 1024, 2048
+    };
+    static const uint16_t presetH[] = {
+        0, 256, 512, 512,1024, 1024, 2048, 2048
+    };
+
     if (n >= 0) {
         _spinW->setValue(presetW[n]);
         _spinH->setValue(presetH[n]);
