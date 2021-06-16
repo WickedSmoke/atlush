@@ -5,8 +5,10 @@ CONFIG += qt debug
 QT += widgets
 RESOURCES = icons.qrc
 
+INCLUDEPATH = support
+
 HEADERS = AWindow.h ItemValues.h CanvasDialog.h ExtractDialog.h \
-	IOWidget.h RecentFiles.h
+	IOWidget.h support/RecentFiles.h
 
 SOURCES = AWindow.cpp packImages.cpp CanvasDialog.cpp ExtractDialog.cpp \
-	IOWidget.cpp RecentFiles.cpp
+	IOWidget.cpp support/RecentFiles.cpp
