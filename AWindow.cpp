@@ -1424,6 +1424,47 @@ QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
     return item;
 }
 
+#include "atl_read.h"
+
+struct AtlReadContext {
+    AWindow* win;
+    QGraphicsItem* pitem;
+};
+
+void AWindow::atlElement(int type, const AtlRegion* reg, void* user)
+{
+    AtlReadContext* ctx = (AtlReadContext*) user;
+    AWindow* win = ctx->win;
+    switch (type) {
+        case ATL_DOCUMENT:
+            win->_docSize.setWidth(reg->w);
+            win->_docSize.setHeight(reg->h);
+            break;
+
+        case ATL_IMAGE:
+        {
+            QPixmap pix(QString(reg->projPath));
+            if (pix.isNull())
+                pix = QPixmap(":/icons/missing.png");
+
+            ctx->pitem = win->makeImage(pix, reg->x, reg->y);
+            ctx->pitem->setData(ID_NAME, QString(reg->name));
+        }
+            break;
+
+        case ATL_REGION:
+            if (ctx->pitem) {
+                QPointF pp = ctx->pitem->scenePos();
+                QGraphicsItem* region =
+                    win->makeRegion(ctx->pitem,
+                                reg->x - int(pp.x()), reg->y - int(pp.y()),
+                                reg->w, reg->h);
+                region->setData(ID_NAME, QString(reg->name));
+            }
+            break;
+    }
+}
+
 /*
  * Append items in project file to scene.
  *
@@ -1432,104 +1473,10 @@ QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
  */
 bool AWindow::loadProject(const QString& path, int* errorLine)
 {
-    QString imagePath;
-    QFileInfo info(path);
-    FILE* fp = fopen(UTF8(path), "r");
-    if (! fp) {
-        *errorLine = -1;
-        return false;
-    }
-
-    bool done = false;
-    {
-    QGraphicsItem* pitem = NULL;
-    char* buf = new char[1000];
-    int x, y, w, h;
-    int nested = 0;
-    int lineCount = 0;
-
-    // Parse Boron string!/coord!/block! values.
-    while (fread(buf, 1, 1, fp) == 1) {
-      switch (buf[0]) {
-        case '"':
-            if (fscanf(fp, "%999[^\"]\" %d,%d,%d,%d", buf, &x, &y, &w, &h) != 5)
-                goto fail;
-            //printf("KR %s %d,%d,%d,%d\n", buf, x, y, w, h);
-add_item:
-        {
-            QString name(buf);
-            if (nested) {
-                if (pitem) {
-                    QPointF pp = pitem->scenePos();
-                    QGraphicsItem* region =
-                    makeRegion(pitem, x - int(pp.x()), y - int(pp.y()), w, h);
-                    region->setData(ID_NAME, name);
-                }
-            } else {
-                if (QDir::isRelativePath(name))
-                    imagePath = info.path() + '/' + name;
-                else
-                    imagePath = name;
-                QPixmap pix(imagePath);
-                if (pix.isNull())
-                    pix = QPixmap(":/icons/missing.png");
-
-                pitem = makeImage(pix, x, y);
-                pitem->setData(ID_NAME, name);
-            }
-        }
-            break;
-
-        case '[':
-            ++nested;
-            break;
-
-        case ']':
-            --nested;
-            break;
-
-        case 'i':
-            if (fscanf(fp, "mage-atlas %d %d,%d", &x, &w, &h) != 3)
-                goto fail;
-            if (x != 1)
-                goto fail;          // Invalid version.
-            _docSize.setWidth(w);
-            _docSize.setHeight(h);
-            break;
-
-        case '{':
-            if (fscanf(fp, "%999[^}]} %d,%d,%d,%d", buf, &x, &y, &w, &h) != 5)
-                goto fail;
-            goto add_item;
-
-        case ';':
-            while ((x = fgetc(fp)) != EOF) {
-                if (x == '\n')
-                    break;
-            }
-            break;
-
-        case ' ':
-        case '\t':
-            break;
-
-        case '\n':
-            ++lineCount;
-            break;
-
-        default:
-            goto fail;
-      }
-    }
-    done = true;
-
-fail:
-    *errorLine = lineCount;
-    delete[] buf;
-    }
-
-    fclose(fp);
-    return done;
+    AtlReadContext ctx;
+    ctx.win   = this;
+    ctx.pitem = NULL;
+    return atl_read(UTF8(path), errorLine, atlElement, &ctx);
 }
 
 static int regionWriteBoron(FILE* fp, const ItemValues& iv) {

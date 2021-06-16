@@ -18,6 +18,7 @@ class QSpinBox;
 class IOWidget;
 class IODialog;
 class CanvasDialog;
+struct AtlRegion;
 
 class AWindow : public QMainWindow
 {
@@ -79,6 +80,8 @@ private slots:
     void execute(int pi, int push);
 
 private:
+
+    static void atlElement(int, const AtlRegion*, void*);
 
     void createActions();
     void createMenus();
