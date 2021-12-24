@@ -37,11 +37,11 @@ using the size value widgets on the toolbar.
 
 ### Export Image
 
-Create a new image file containing the pixel data of all images in the
-workspace.
+Export Image creates a new image file containing the pixel data of all images
+in the workspace.
 
 
-Packing Tools
+Editing Tools
 -------------
 
 ### Pack Images
@@ -53,8 +53,9 @@ images by size before packing.
 
 ### Merge Images
 
-Merge all images in the workspace into a single image.  All regions are
-transferred to the new image and the original images are then removed.
+Merge Images copies the pixel data of all images in the workspace into a
+single image.  All regions are transferred to the new image and the original
+images are then removed.
 
 ### Extract Regions
 
@@ -68,7 +69,8 @@ The image file names will be copied from the region name.
 
 ### Crop Images
 
-Remove any fully transparent outside areas from selected images.
+Crop Images reduces the size of selected images so that any transparent edges
+are removed.
 
 
 Command Line Arguments
@@ -78,6 +80,21 @@ A single project file or image directory can be provided on the command line.
 
 If the argument is a directory path then all .png, .jpeg, & .jpg files will
 be imported.
+
+
+I/O Pipelines
+-------------
+
+Importing and exporting of image & region information is handled through
+external programs which translate Atlush .atl files.
+
+Pairs of import & export commands can be defined for various projects by
+selecting the Settings -> **Configure Pipelines** menu item.  These commands
+are then invoked by pressing the **> Import** & **Export >** toolbar buttons.
+
+Environment variables can be used in commands by preceding the variable name
+with a '$' character.  The variable **$ATL** is defined internally as the
+filename of the .atl file which the external program must read or write.
 
 
 How to Compile
