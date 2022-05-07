@@ -61,6 +61,7 @@ private slots:
     void hideRegions(bool);
     void lockRegions(bool);
     void lockImages(bool);
+    void showHotspots(bool);
     void sceneChange();
     void syncSelection();
     void newProject();
@@ -71,6 +72,8 @@ private slots:
     void modY(int);
     void modW(int);
     void modH(int);
+    void modHotX(int);
+    void modHotY(int);
     void packImages();
     void mergeImages();
     void extractRegions();
@@ -94,10 +97,12 @@ private:
     bool exportAtlasImage(const QString& path, int w, int h);
     void removeItems(QGraphicsItem* const* list, int count);
     QGraphicsPixmapItem* makeImage(const QPixmap&, int x, int y);
-    QGraphicsRectItem* makeRegion(QGraphicsItem* parent, int, int, int, int);
+    QGraphicsRectItem* makeRegion(QGraphicsItem* parent, int, int, int, int,
+                                  int, int);
     bool loadProject(const QString& path, int* errorLine);
     bool saveProject(const QString& path);
     void extractRegionsOp(const QString& file, const QColor& color);
+    void updateHotspot(int x, int y);
 
     QAction* _actNew;
     QAction* _actOpen;
@@ -116,6 +121,7 @@ private:
     QAction* _actHideRegions;
     QAction* _actLockRegions;
     QAction* _actLockImages;
+    QAction* _actShowHot;
     QAction* _actPack;
 
     QToolBar* _tools;
@@ -127,6 +133,10 @@ private:
     QSpinBox*  _spinH;
     QObject* _modifiedStr;
     CanvasDialog* _canvasDialog;
+
+    QToolBar* _hotspotBar;
+    QSpinBox* _spinHotX;
+    QSpinBox* _spinHotY;
 
     QToolBar* _ioBar;
     IOWidget* _io;
@@ -156,6 +166,8 @@ private:
     // Disabled copy constructor and operator=
     AWindow( const AWindow & ) : QMainWindow( 0 ) {}
     AWindow &operator=( const AWindow & ) { return *this; }
+
+    friend class AView;
 };
 
 

@@ -80,6 +80,177 @@ void itemValues(ItemValues& iv, const QGraphicsItem* item)
 }
 
 //----------------------------------------------------------------------------
+// Scene Classes
+
+#define HANDLE_SIZE     5
+
+static inline QPointF& pixelSnap(QPointF& pnt)
+{
+    pnt.setX( round(pnt.x()) );
+    pnt.setY( round(pnt.y()) );
+    return pnt;
+}
+
+class AImage : public QGraphicsPixmapItem
+{
+protected:
+     QVariant itemChange(GraphicsItemChange change, const QVariant& value)
+     {
+         if (change == ItemPositionChange) {
+             QPointF newPos = value.toPointF();
+             return pixelSnap(newPos);
+         }
+         return QGraphicsPixmapItem::itemChange(change, value);
+     }
+};
+
+class ARegion : public QGraphicsRectItem
+{
+public:
+    ARegion(QGraphicsItem* parent) : QGraphicsRectItem(parent)
+    {
+        _activeHandle = 0;
+    }
+
+    int hotspot[2];
+
+    void paint(QPainter* painter, const QStyleOptionGraphicsItem* option,
+               QWidget* widget)
+    {
+        QGraphicsRectItem::paint(painter, option, widget);
+
+        const QGraphicsScene* gs = scene();
+        if (gs && gs->property("shot").toBool()) {
+            int hx = hotspot[0];
+            int hy = hotspot[1];
+            if (hx || hy) {
+                painter->setBrush(Qt::NoBrush);
+                painter->setPen(Qt::black);
+                painter->drawLine(hx - 4, hy, hx + 4, hy);
+                painter->drawLine(hx, hy - 4, hx, hy + 4);
+            }
+        }
+    }
+
+protected:
+    QVariant itemChange(GraphicsItemChange change, const QVariant& value)
+    {
+        if (change == ItemPositionChange) {
+            QPointF newPos = value.toPointF();
+            return pixelSnap(newPos);
+        }
+        return QGraphicsRectItem::itemChange(change, value);
+    }
+
+    void mouseMoveEvent(QGraphicsSceneMouseEvent* ev)
+    {
+        QPointF delta = ev->scenePos() - ev->buttonDownScenePos(Qt::LeftButton);
+        switch(_activeHandle) {
+            case 1:
+                setPos(_resizePos + delta);
+                pixelSnapDim(_resizeW - delta.x(), _resizeH - delta.y());
+                break;
+            case 2:
+                setPos(_resizePos.x(), _resizePos.y() + delta.y());
+                pixelSnapDim(_resizeW + delta.x(), _resizeH - delta.y());
+                break;
+            case 3:
+                setPos(_resizePos.x() + delta.x(), _resizePos.y());
+                pixelSnapDim(_resizeW - delta.x(), _resizeH + delta.y());
+                break;
+            case 4:
+                pixelSnapDim(_resizeW + delta.x(), _resizeH + delta.y());
+                break;
+            case 5:
+                break;
+            default:
+                QGraphicsRectItem::mouseMoveEvent(ev);
+                break;
+        }
+    }
+
+    void mousePressEvent(QGraphicsSceneMouseEvent* ev)
+    {
+        static const Qt::CursorShape dragCursor[5] = {
+            Qt::DragMoveCursor,
+            Qt::SizeFDiagCursor, Qt::SizeBDiagCursor,
+            Qt::SizeBDiagCursor, Qt::SizeFDiagCursor
+            // Qt::SizeVerCursor, Qt::SizeHorCursor
+        };
+        if (ev->button() == Qt::LeftButton) {
+            /*
+            if (ev->modifiers() & Qt::ShiftModifier) {
+                ev->accept();
+                _activeHandle = 5;
+                QPointF pnt(ev->pos());
+                hotspot[0] = int(pnt.x());
+                hotspot[1] = int(pnt.y());
+                update();
+                return;
+            } else*/ {
+                _activeHandle = handleAt(ev->pos());
+                if (_activeHandle) {
+                    QRectF br = rect();
+                    _resizeW = br.width();
+                    _resizeH = br.height();
+                    _resizePos = pos();
+                }
+                setCursor(dragCursor[_activeHandle]);
+            }
+        }
+        QGraphicsRectItem::mousePressEvent(ev);
+    }
+
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent* ev)
+    {
+        if (ev->button() == Qt::LeftButton) {
+            _activeHandle = 0;
+            setCursor(Qt::ArrowCursor);
+        }
+        QGraphicsRectItem::mouseReleaseEvent(ev);
+    }
+
+private:
+    void pixelSnapDim(qreal w, qreal h)
+    {
+        QPointF dim(w , h);
+        pixelSnap(dim);
+        if (dim.x() < 1.0)
+            dim.setX(1.0);
+        if (dim.y() < 1.0)
+            dim.setY(1.0);
+        setRect(0, 0, dim.x(), dim.y());
+    }
+
+    int handleAt(const QPointF& pos)
+    {
+        QRectF br = rect();
+        int h;
+
+        if (br.width() <= HANDLE_SIZE || br.height() <= HANDLE_SIZE)
+            return 4;
+
+        if (pos.y() < br.top() + HANDLE_SIZE)
+            h = 1;
+        else if (pos.y() > br.bottom() - HANDLE_SIZE)
+            h = 3;
+        else
+            return 0;
+
+        if (pos.x() < br.left() + HANDLE_SIZE)      // 1---2
+            return h;                               // |   |
+        if (pos.x() > br.right() - HANDLE_SIZE)     // 3---4
+            return h + 1;
+        return 0;
+    }
+
+    QPointF _resizePos;
+    qreal _resizeW;
+    qreal _resizeH;
+    int _activeHandle;
+};
+
+//----------------------------------------------------------------------------
 
 struct ItemShapshot
 {
@@ -127,7 +298,22 @@ private:
 
 void AView::mousePressEvent(QMouseEvent* ev)
 {
-    if (ev->button() == Qt::MiddleButton) {
+    if (ev->button() == Qt::LeftButton &&
+        ev->modifiers() & Qt::ShiftModifier) {
+        ItemList list = scene()->selectedItems();
+        QGraphicsItem* gi = list.empty() ? itemAt(ev->pos()) : list[0];
+
+        if (gi && IS_REGION(gi)) {
+            QPointF pnt( gi->mapFromScene(mapToScene(ev->pos())) );
+            ARegion* region = static_cast<ARegion*>(gi);
+            region->hotspot[0] = int(pnt.x());
+            region->hotspot[1] = int(pnt.y());
+            region->update();
+
+            static_cast<AWindow*>(parentWidget())->updateHotspot(
+                                    region->hotspot[0], region->hotspot[1]);
+        }
+    } else if (ev->button() == Qt::MiddleButton) {
         _panStart = ev->pos();
         //setCursor(Qt::ClosedHandCursor);
         ev->accept();
@@ -237,6 +423,7 @@ AWindow::AWindow()
     _prevImagePath = settings.value("prev-image").toString();
     _ioSpec = settings.value("io-pipelines").toString();
     _recent.setFiles(settings.value("recent-files").toStringList());
+    _actShowHot->setChecked(settings.value("show-hotspots", false).toBool());
     _packPad->setValue( settings.value("pack-padding").toInt() );
 
     _io->setSpec(_ioSpec);
@@ -256,6 +443,7 @@ void AWindow::closeEvent( QCloseEvent* ev )
     settings.setValue("prev-image", _prevImagePath);
     settings.setValue("io-pipelines", _ioSpec);
     settings.setValue("recent-files", _recent.files);
+    settings.setValue("show-hotspots", _actShowHot->isChecked());
     settings.setValue("pack-padding", _packPad->value());
 
     QMainWindow::closeEvent( ev );
@@ -371,6 +559,9 @@ void AWindow::createActions()
     _actLockImages->setCheckable(true);
     connect(_actLockImages, SIGNAL(toggled(bool)), SLOT(lockImages(bool)));
 
+    _actShowHot = new QAction("Show &Hotspots", this);
+    _actShowHot->setCheckable(true);
+
     _actPack = new QAction(QIcon(":/icons/pack.png"),
                            "&Pack Images", this );
     connect(_actPack, SIGNAL(triggered()), SLOT(packImages()));
@@ -457,6 +648,7 @@ void AWindow::createMenus()
     view->addAction( _actHideRegions );
     view->addAction( _actLockRegions );
     view->addAction( _actLockImages );
+    view->addAction( _actShowHot );
 
     QMenu* sett = bar->addMenu( "&Settings" );
     sett->addAction("Configure &Pipelines...", this, SLOT(editPipelines()));
@@ -467,10 +659,18 @@ void AWindow::createMenus()
     help->addAction( _actAbout );
 }
 
-QSpinBox* makeSpinBox()
+static QSpinBox* makeSpinBox()
 {
     QSpinBox* spin = new QSpinBox;
     spin->setRange(0, 8192);
+    spin->setEnabled(false);
+    return spin;
+}
+
+static QSpinBox* makeSpinHot()
+{
+    QSpinBox* spin = new QSpinBox;
+    spin->setRange(-255, 1024);
     spin->setEnabled(false);
     return spin;
 }
@@ -502,6 +702,14 @@ void AWindow::createTools()
     _propBar->addWidget(_spinH = makeSpinBox());
     addToolBar(Qt::TopToolBarArea, _propBar);
 
+    _hotspotBar = new QToolBar;
+    _hotspotBar->setObjectName("hotspotBar");
+    _hotspotBar->addWidget(_spinHotX = makeSpinHot());
+    _hotspotBar->addWidget(_spinHotY = makeSpinHot());
+    _hotspotBar->setVisible(false);
+    addToolBar(Qt::TopToolBarArea, _hotspotBar);
+    connect(_actShowHot, SIGNAL(toggled(bool)), SLOT(showHotspots(bool)));
+
     _name->setEnabled(false);
     connect(_name, SIGNAL(editingFinished()), SLOT(modName()) );
     connect(_name, SIGNAL(textEdited(const QString&)), SLOT(stringEdit()) );
@@ -509,6 +717,8 @@ void AWindow::createTools()
     connect(_spinY, SIGNAL(valueChanged(int)), SLOT(modY(int)));
     connect(_spinW, SIGNAL(valueChanged(int)), SLOT(modW(int)));
     connect(_spinH, SIGNAL(valueChanged(int)), SLOT(modH(int)));
+    connect(_spinHotX, SIGNAL(valueChanged(int)), SLOT(modHotX(int)));
+    connect(_spinHotY, SIGNAL(valueChanged(int)), SLOT(modHotY(int)));
 
 
     _packPad = new QSpinBox;
@@ -542,6 +752,12 @@ void AWindow::createTools()
     _searchBar->setObjectName("searchBar");
     _searchBar->addWidget(_search);
     addToolBar(Qt::BottomToolBarArea, _searchBar);
+}
+
+void AWindow::showHotspots(bool shown)
+{
+    _hotspotBar->setVisible(shown);
+    _scene->setProperty("shot", shown);
 }
 
 void AWindow::updateProjectName(const QString& path)
@@ -1036,7 +1252,7 @@ void AWindow::addRegion()
         if (item->type() != GIT_PIXMAP)
             item = item->parentItem();
         if (item) {
-            QGraphicsItem* child = makeRegion(item, 0, 0, 32, 32);
+            QGraphicsItem* child = makeRegion(item, 0, 0, 32, 32, 0, 0);
             child->setData(ID_NAME, QString("<unnamed>"));
         }
     }
@@ -1164,6 +1380,12 @@ void AWindow::sceneChange()
     }
 }
 
+void AWindow::updateHotspot(int x, int y)
+{
+    assignSpin(_spinHotX, x);
+    assignSpin(_spinHotY, y);
+}
+
 void AWindow::syncSelection()
 {
     ItemList sel = _scene->selectedItems();
@@ -1178,6 +1400,8 @@ void AWindow::syncSelection()
     _spinY->setEnabled(isSelected);
     _spinW->setEnabled(isRegion);
     _spinH->setEnabled(isRegion);
+    _spinHotX->setEnabled(isRegion);
+    _spinHotY->setEnabled(isRegion);
 
     if (isSelected) {
         ItemValues val;
@@ -1187,6 +1411,12 @@ void AWindow::syncSelection()
         // _spinX & Y updated in sceneChange().
         assignSpin(_spinW, val.w);
         assignSpin(_spinH, val.h);
+
+        if (isRegion && _actShowHot->isChecked()) {
+            const int* hot = static_cast<ARegion *>(sel[0])->hotspot;
+            assignSpin(_spinHotX, hot[0]);
+            assignSpin(_spinHotY, hot[1]);
+        }
 
         _selItem = sel[0];
         //_selPos = _selItem->pos();
@@ -1307,6 +1537,26 @@ void AWindow::modH(int n)
     setRectDim(_selItem, -1, n);
 }
 
+// Set either hotX or hotY.
+static void setHotspotN(QGraphicsItem* gi, int i, int val)
+{
+    if (gi && gi->type() == GIT_RECT) {
+        ARegion* region = static_cast<ARegion*>(gi);
+        region->hotspot[i] = val;
+        gi->update();
+    }
+}
+
+void AWindow::modHotX(int n)
+{
+    setHotspotN(_selItem, 0, n);
+}
+
+void AWindow::modHotY(int n)
+{
+    setHotspotN(_selItem, 1, n);
+}
+
 void AWindow::editDocSize()
 {
     if (! _canvasDialog) {
@@ -1384,143 +1634,6 @@ void AWindow::execute(int pi, int push)
 }
 
 //----------------------------------------------------------------------------
-// Scene Classes
-
-#define HANDLE_SIZE     5
-
-static inline QPointF& pixelSnap(QPointF& pnt)
-{
-    pnt.setX( round(pnt.x()) );
-    pnt.setY( round(pnt.y()) );
-    return pnt;
-}
-
-class AImage : public QGraphicsPixmapItem
-{
-protected:
-     QVariant itemChange(GraphicsItemChange change, const QVariant& value)
-     {
-         if (change == ItemPositionChange) {
-             QPointF newPos = value.toPointF();
-             return pixelSnap(newPos);
-         }
-         return QGraphicsPixmapItem::itemChange(change, value);
-     }
-};
-
-class ARegion : public QGraphicsRectItem
-{
-public:
-    ARegion(QGraphicsItem* parent) : QGraphicsRectItem(parent)
-    {
-    }
-
-protected:
-    QVariant itemChange(GraphicsItemChange change, const QVariant& value)
-    {
-        if (change == ItemPositionChange) {
-            QPointF newPos = value.toPointF();
-            return pixelSnap(newPos);
-        }
-        return QGraphicsRectItem::itemChange(change, value);
-    }
-
-    void mouseMoveEvent(QGraphicsSceneMouseEvent* ev)
-    {
-        QPointF delta = ev->scenePos() - ev->buttonDownScenePos(Qt::LeftButton);
-        switch(_activeHandle) {
-            case 1:
-                setPos(_resizePos + delta);
-                pixelSnapDim(_resizeW - delta.x(), _resizeH - delta.y());
-                break;
-            case 2:
-                setPos(_resizePos.x(), _resizePos.y() + delta.y());
-                pixelSnapDim(_resizeW + delta.x(), _resizeH - delta.y());
-                break;
-            case 3:
-                setPos(_resizePos.x() + delta.x(), _resizePos.y());
-                pixelSnapDim(_resizeW - delta.x(), _resizeH + delta.y());
-                break;
-            case 4:
-                pixelSnapDim(_resizeW + delta.x(), _resizeH + delta.y());
-                break;
-            default:
-                QGraphicsRectItem::mouseMoveEvent(ev);
-                break;
-        }
-    }
-
-    void mousePressEvent(QGraphicsSceneMouseEvent* ev)
-    {
-        static const Qt::CursorShape dragCursor[5] = {
-            Qt::DragMoveCursor,
-            Qt::SizeFDiagCursor, Qt::SizeBDiagCursor,
-            Qt::SizeBDiagCursor, Qt::SizeFDiagCursor
-            // Qt::SizeVerCursor, Qt::SizeHorCursor
-        };
-        if (ev->button() == Qt::LeftButton) {
-            _activeHandle = handleAt(ev->pos());
-            if (_activeHandle) {
-                QRectF br = rect();
-                _resizeW = br.width();
-                _resizeH = br.height();
-                _resizePos = pos();
-            }
-            setCursor(dragCursor[_activeHandle]);
-        }
-        QGraphicsRectItem::mousePressEvent(ev);
-    }
-
-    void mouseReleaseEvent(QGraphicsSceneMouseEvent* ev)
-    {
-        if (ev->button() == Qt::LeftButton) {
-            _activeHandle = 0;
-            setCursor(Qt::ArrowCursor);
-        }
-        QGraphicsRectItem::mouseReleaseEvent(ev);
-    }
-
-private:
-    void pixelSnapDim(qreal w, qreal h)
-    {
-        QPointF dim(w , h);
-        pixelSnap(dim);
-        if (dim.x() < 1.0)
-            dim.setX(1.0);
-        if (dim.y() < 1.0)
-            dim.setY(1.0);
-        setRect(0, 0, dim.x(), dim.y());
-    }
-
-    int handleAt(const QPointF& pos)
-    {
-        QRectF br = rect();
-        int h;
-
-        if (br.width() <= HANDLE_SIZE || br.height() <= HANDLE_SIZE)
-            return 4;
-
-        if (pos.y() < br.top() + HANDLE_SIZE)
-            h = 1;
-        else if (pos.y() > br.bottom() - HANDLE_SIZE)
-            h = 3;
-        else
-            return 0;
-
-        if (pos.x() < br.left() + HANDLE_SIZE)      // 1---2
-            return h;                               // |   |
-        if (pos.x() > br.right() - HANDLE_SIZE)     // 3---4
-            return h + 1;
-        return 0;
-    }
-
-    QPointF _resizePos;
-    qreal _resizeW;
-    qreal _resizeH;
-    int _activeHandle;
-};
-
-//----------------------------------------------------------------------------
 // Project methods
 
 void AWindow::newProject()
@@ -1546,10 +1659,10 @@ QGraphicsPixmapItem* AWindow::makeImage(const QPixmap& pix, int x, int y)
 }
 
 QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
-                                       int w, int h)
+                                       int w, int h, int hotx, int hoty)
 {
     QRectF rect(0.0, 0.0, w, h);
-    QGraphicsRectItem* item = new ARegion(parent);
+    ARegion* item = new ARegion(parent);
 
     item->setData(ID_SERIAL, ++_serialNo);
     item->setRect(rect);
@@ -1560,6 +1673,8 @@ QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
                    QGraphicsItem::ItemIsSelectable |
                    QGraphicsItem::ItemSendsGeometryChanges);
     item->setPos(x, y);
+    item->hotspot[0] = hotx;
+    item->hotspot[1] = hoty;
 
     //QPointF p = item->scenePos();
     //printf("KR region %f,%f\n", p.x(), p.y());
@@ -1601,7 +1716,7 @@ void AWindow::atlElement(int type, const AtlRegion* reg, void* user)
                 QGraphicsItem* region =
                     win->makeRegion(ctx->pitem,
                                 reg->x - int(pp.x()), reg->y - int(pp.y()),
-                                reg->w, reg->h);
+                                reg->w, reg->h, reg->hotx, reg->hoty);
                 region->setData(ID_NAME, QString(reg->name));
             }
             break;
@@ -1622,9 +1737,14 @@ bool AWindow::loadProject(const QString& path, int* errorLine)
     return atl_read(UTF8(path), errorLine, atlElement, &ctx);
 }
 
-static int regionWriteBoron(FILE* fp, const ItemValues& iv) {
-    return fprintf(fp, "\"%s\" %d,%d,%d,%d\n",
-                   iv.name.constData(), iv.x, iv.y, iv.w, iv.h);
+static int regionWriteBoron(FILE* fp, const ItemValues& iv,
+                            const int* hotspot) {
+    char end = (hotspot && (hotspot[0] || hotspot[1])) ? ',' : '\n';
+    int n = fprintf(fp, "\"%s\" %d,%d,%d,%d%c",
+                    iv.name.constData(), iv.x, iv.y, iv.w, iv.h, end);
+    if (n > 0 && end == ',')
+        n = fprintf(fp, "%d,%d\n", hotspot[0], hotspot[1]);
+    return n;
 }
 
 /*
@@ -1647,7 +1767,7 @@ bool AWindow::saveProject(const QString& path)
         if (it->type() != GIT_PIXMAP)
             continue;
         itemValues(val, it);
-        if (regionWriteBoron(fp, val) < 0)
+        if (regionWriteBoron(fp, val, NULL) < 0)
             goto fail;
 
         ItemList clist = it->childItems();
@@ -1655,9 +1775,10 @@ bool AWindow::saveProject(const QString& path)
             fprintf(fp, "[\n");
             for(const QGraphicsItem* ch : clist) {
                 if (IS_REGION(ch)) {
+                    const ARegion* region = static_cast<const ARegion *>(ch);
                     fprintf(fp, "  ");
                     itemValues(val, ch);
-                    if (regionWriteBoron(fp, val) < 0)
+                    if (regionWriteBoron(fp, val, region->hotspot) < 0)
                         goto fail;
                 }
             }

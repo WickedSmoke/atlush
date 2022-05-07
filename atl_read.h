@@ -15,6 +15,7 @@ struct AtlRegion {
     const char* projPath;
     const char* name;
     int x, y, w, h;
+    int hotx, hoty;
 };
 
 
@@ -74,25 +75,35 @@ int atl_read(const char* path, int* errorLine,
     {
     AtlRegion reg;
     const size_t bufSize = 1000;
+    const char* itemPattern;
     char* imagePath = NULL;
     char* buf = (char*) malloc(bufSize);
     int nested = 0;
     int lineCount = 0;
     int pathLen = atl_path(path);
+    char nextCh;
     int ch;
 
     reg.name = buf;
 
     // Parse Boron string!/coord!/block! values.
     while (fread(buf, 1, 1, fp) == 1) {
+next_buf0:
       switch (buf[0]) {
         case '"':
-            if (fscanf(fp, "%999[^\"]\" %d,%d,%d,%d",
-                       buf, &reg.x, &reg.y, &reg.w, &reg.h) != 5)
+            itemPattern = "%999[^\"]\" %d,%d,%d,%d%c";
+get_item:
+            if (fscanf(fp, itemPattern,
+                       buf, &reg.x, &reg.y, &reg.w, &reg.h, &nextCh) != 6)
                 goto fail;
+            if (nextCh == ',') {
+                if (fscanf(fp, "%d,%d", &reg.hotx, &reg.hoty) != 2)
+                    goto fail;
+                nextCh = 0;
+            } else
+                reg.hotx = reg.hoty = 0;
             //printf("KR %s %d,%d,%d,%d\n", buf, reg.x, reg.y, reg.w, reg.h);
-add_item:
-        {
+
             if (nested) {
                 reg.projPath = NULL;
                 reg.name = buf;
@@ -111,7 +122,11 @@ add_item:
                 reg.name = buf;
                 element(ATL_IMAGE, &reg, user);
             }
-        }
+
+            if (nextCh) {
+                buf[0] = nextCh;
+                goto next_buf0;
+            }
             break;
 
         case '[':
@@ -137,10 +152,8 @@ add_item:
             break;
 
         case '{':
-            if (fscanf(fp, "%999[^}]} %d,%d,%d,%d",
-                       buf, &reg.x, &reg.y, &reg.w, &reg.h) != 5)
-                goto fail;
-            goto add_item;
+            itemPattern = "%999[^}]} %d,%d,%d,%d%c";
+            goto get_item;
 
         case ';':
             while ((ch = fgetc(fp)) != EOF) {
