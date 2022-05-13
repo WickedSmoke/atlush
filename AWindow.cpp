@@ -67,7 +67,8 @@ void itemValues(ItemValues& iv, const QGraphicsItem* item)
     iv.w = int(rect.width());
     iv.h = int(rect.height());
 
-    if (item->type() == GIT_PIXMAP) {
+    if (item->type() == GIT_PIXMAP &&
+        item->flags() & QGraphicsItem::ItemIsSelectable) {
         // boundingRect grows by 1 pixel when ItemIsSelectable is used!
         iv.w -= 1;
         iv.h -= 1;
