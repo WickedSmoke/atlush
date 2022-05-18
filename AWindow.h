@@ -10,6 +10,7 @@
 #include <QMainWindow>
 #include <QGraphicsView>
 #include "RecentFiles.h"
+#include "undo.h"
 
 
 class QCheckBox;
@@ -27,6 +28,7 @@ class AWindow : public QMainWindow
 public:
 
     AWindow();
+    ~AWindow();
 
     bool openFile(const QString& file);
     bool directoryImport(const QString& path);
@@ -52,6 +54,7 @@ private slots:
     void addRegion();
     void removeSelected();
     void undo();
+    void redo();
     void viewReset();
     void viewZoomIn();
     void viewZoomOut();
@@ -86,6 +89,7 @@ private:
     void createActions();
     void createMenus();
     void createTools();
+    void undoClear();
     void updateProjectName(const QString& path);
     bool exportAtlasImage(const QString& path, int w, int h);
     void removeItems(QGraphicsItem* const* list, int count);
@@ -105,6 +109,7 @@ private:
     QAction* _actAddRegion;
     QAction* _actRemove;
     QAction* _actUndo;
+    QAction* _actRedo;
     QAction* _actViewReset;
     QAction* _actZoomIn;
     QAction* _actZoomOut;
@@ -138,8 +143,9 @@ private:
     QGraphicsView* _view;
     QGraphicsItem* _selItem;
     QPixmap        _bgPix;
-    QPointF        _selPos;
     QSize          _docSize;
+    UndoStack      _undo;
+    uint32_t       _serialNo;
 
     // Settings
     QString _prevProjPath;

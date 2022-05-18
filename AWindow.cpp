@@ -30,6 +30,10 @@
 
 #define ITEM_PIXMAP(gi) static_cast<const QGraphicsPixmapItem*>(gi)->pixmap()
 
+enum UndoOpcodes {
+    UNDO_POS = 1
+};
+
 #define EXT_COUNT   4
 static const char* imageExt[EXT_COUNT] = { ".png", ".jpeg", ".jpg", ".ppm" };
 
@@ -77,10 +81,23 @@ void itemValues(ItemValues& iv, const QGraphicsItem* item)
 
 //----------------------------------------------------------------------------
 
+struct ItemShapshot
+{
+    ItemShapshot(QGraphicsItem* gi) {
+        item = gi;
+        x = gi->x();
+        y = gi->y();
+    }
+
+    QGraphicsItem* item;
+    float x, y;
+};
+
 class AView : public QGraphicsView
 {
 public:
-    AView(QGraphicsScene* scene) : QGraphicsView(scene)
+    AView(QGraphicsScene* scene, UndoStack* undo, QAction* undoAct)
+        : QGraphicsView(scene), _undoStack(undo), _undoAct(undoAct)
     {
         setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     }
@@ -96,21 +113,71 @@ public:
 
 protected:
     void mousePressEvent(QMouseEvent*);
+    void mouseReleaseEvent(QMouseEvent*);
     void mouseMoveEvent(QMouseEvent*);
     void wheelEvent(QWheelEvent*);
 
 private:
     QPoint _panStart;
+    std::vector<ItemShapshot> _undoSnap;
+    std::vector<UndoValue> _undoValues;
+    UndoStack* _undoStack;
+    QAction* _undoAct;
 };
 
-void AView::mousePressEvent(QMouseEvent* event)
+void AView::mousePressEvent(QMouseEvent* ev)
 {
-    if (event->button() == Qt::MiddleButton) {
-        _panStart = event->pos();
+    if (ev->button() == Qt::MiddleButton) {
+        _panStart = ev->pos();
         //setCursor(Qt::ClosedHandCursor);
-        event->accept();
-    } else
-        QGraphicsView::mousePressEvent(event);
+        ev->accept();
+    } else {
+        QGraphicsView::mousePressEvent(ev);
+
+        // Snapshot items for undo.
+        if (ev->button() == Qt::LeftButton) {
+            _undoSnap.clear();
+            ItemList sel = scene()->selectedItems();
+            for(int i = 0; i < sel.size(); ++i)
+                _undoSnap.emplace_back(sel.at(i));
+        }
+    }
+}
+
+void AView::mouseReleaseEvent(QMouseEvent* ev)
+{
+    QGraphicsView::mouseReleaseEvent(ev);
+
+    // Record any item changes.
+    if (ev->button() == Qt::LeftButton && ! _undoSnap.empty()) {
+        UndoValue uval;
+
+        // TODO: Handle deletion of items during drag.
+        //       (or forbid it during drag)
+
+        //printf("KR snap %ld\n", _undoSnap.size());
+        for (const auto& it : _undoSnap) {
+            if (it.item->x() != it.x || it.item->y() != it.y) {
+                uval.u = it.item->data(ID_SERIAL).toUInt();
+                _undoValues.push_back(uval);
+                //printf("KR   mod %d %d\n", uval.u, it.item->type());
+
+                uval.s[0] = int16_t(it.item->x() - it.x);
+                uval.s[1] = int16_t(it.item->y() - it.y);
+                _undoValues.push_back(uval);
+            }
+        }
+
+        if (! _undoValues.empty()) {
+            size_t len = _undoValues.size();
+            if (len < 255)
+                undo_record(_undoStack, UNDO_POS, _undoValues.data(), len);
+            _undoValues.clear();
+
+            _undoAct->setEnabled(true);
+            //emit undoStackChanged(_undoStack->used);
+        }
+    }
 }
 
 void AView::mouseMoveEvent(QMouseEvent* event)
@@ -143,6 +210,8 @@ void AView::wheelEvent(QWheelEvent* event)
 AWindow::AWindow()
     : _modifiedStr(NULL), _canvasDialog(NULL), _ioDialog(NULL), _selItem(NULL)
 {
+    undo_init(&_undo, 1024*16);
+    _serialNo = 0;
     setWindowTitle(APP_NAME);
 
     createActions();
@@ -153,7 +222,7 @@ AWindow::AWindow()
     connect(_scene, SIGNAL(selectionChanged()), SLOT(syncSelection()));
     connect(_scene, SIGNAL(changed(const QList<QRectF>&)), SLOT(sceneChange()));
 
-    _view = new AView(_scene);
+    _view = new AView(_scene, &_undo, _actUndo);
     _view->setMinimumSize(128, 128);
     _view->setBackgroundBrush(QBrush(Qt::darkGray));
     _view->setDragMode(QGraphicsView::RubberBandDrag);
@@ -173,6 +242,10 @@ AWindow::AWindow()
     _io->setSpec(_ioSpec);
 }
 
+AWindow::~AWindow()
+{
+    undo_free(&_undo);
+}
 
 void AWindow::closeEvent( QCloseEvent* ev )
 {
@@ -259,6 +332,11 @@ void AWindow::createActions()
     _actUndo->setShortcut(QKeySequence::Undo);
     _actUndo->setEnabled(false);
     connect(_actUndo, SIGNAL(triggered()), SLOT(undo()));
+
+    _actRedo = new QAction( "&Redo", this );
+    _actRedo->setShortcut(QKeySequence::Redo);
+    _actRedo->setEnabled(false);
+    connect(_actRedo, SIGNAL(triggered()), SLOT(redo()));
 
     _actViewReset = new QAction( "&Reset View", this );
     _actViewReset->setShortcut(QKeySequence(Qt::Key_Home));
@@ -355,6 +433,7 @@ void AWindow::createMenus()
 
     QMenu* edit = bar->addMenu( "&Edit" );
     edit->addAction( _actUndo );
+    edit->addAction( _actRedo );
     edit->addSeparator();
     edit->addAction( _actAddImage );
     edit->addAction( _actAddRegion );
@@ -486,7 +565,7 @@ static void setupBackground(QGraphicsScene* scene, const QSize& size,
 
 bool AWindow::openFile(const QString& file)
 {
-    _scene->clear();
+    newProject();
 
     // Reset lock/hide to match the default state of newly loaded items.
     _actHideRegions->setChecked(false);
@@ -993,10 +1072,70 @@ void AWindow::removeSelected()
     }
 }
 
+void AWindow::undoClear()
+{
+    undo_clear(&_undo);
+    _actUndo->setEnabled(false);
+    _actRedo->setEnabled(false);
+}
+
+static void undoPosition(QGraphicsScene* scene, const UndoValue* step,
+                         const UndoValue* end, bool redo)
+{
+    QList<QGraphicsItem *> list = scene->items();
+
+    for (; step != end; step += 2) {
+        // Slog through all items to find serial number.
+        for (auto it : list) {
+            if (it->data(ID_SERIAL).toUInt() == step->u) {
+                QPointF pos = it->pos();
+                QPointF delta(float(step[1].s[0]),
+                              float(step[1].s[1]));
+                //printf( "KR # %d %f,%f\n", step->u, delta.x(), delta.y());
+                if (redo)
+                    pos += delta;
+                else
+                    pos -= delta;
+                it->setPos(pos);
+                break;
+            }
+        }
+    }
+}
+
 void AWindow::undo()
 {
-    if (_selItem) {
-        _selItem->setPos(_selPos);
+    const UndoValue* step;
+    int adv = undo_stepBack(&_undo, &step);
+    if (adv & Undo_AdvancedToEnd)
+        _actUndo->setEnabled(false);
+    if (adv & Undo_AdvancedFromStart)
+        _actRedo->setEnabled(true);
+    if (! adv)
+        return;
+
+    switch (step->op.code) {
+        case UNDO_POS:
+            undoPosition(_scene, step + 1, step + step->op.skipNext, false);
+            break;
+    }
+}
+
+void AWindow::redo()
+{
+    const UndoValue* step;
+    int adv = undo_stepForward(&_undo, &step);
+    if (adv & Undo_AdvancedToEnd)
+        _actRedo->setEnabled(false);
+    if (adv & Undo_AdvancedFromStart)
+        _actUndo->setEnabled(true);
+    if (! adv)
+        return;
+
+    switch (step->op.code) {
+        case UNDO_POS:
+            undoPosition(_scene, step + 1, step + step->op.skipNext, true);
+            break;
     }
 }
 
@@ -1033,7 +1172,6 @@ void AWindow::syncSelection()
 
     _actAddRegion->setEnabled(isSelected);
     _actRemove->setEnabled(isSelected);
-    _actUndo->setEnabled(isSelected);
 
     _name->setEnabled(isRegion);
     _spinX->setEnabled(isSelected);
@@ -1051,7 +1189,7 @@ void AWindow::syncSelection()
         assignSpin(_spinH, val.h);
 
         _selItem = sel[0];
-        _selPos = _selItem->pos();
+        //_selPos = _selItem->pos();
     } else {
         _selItem = NULL;
     }
@@ -1388,11 +1526,14 @@ private:
 void AWindow::newProject()
 {
     _scene->clear();
+    undoClear();
+    _serialNo = 0;
 }
 
 QGraphicsPixmapItem* AWindow::makeImage(const QPixmap& pix, int x, int y)
 {
     QGraphicsPixmapItem* item = new AImage;
+    item->setData(ID_SERIAL, ++_serialNo);
     item->setPixmap(pix);
     item->setFlags(QGraphicsItem::ItemIsMovable |
                    QGraphicsItem::ItemIsSelectable |
@@ -1410,6 +1551,7 @@ QGraphicsRectItem* AWindow::makeRegion(QGraphicsItem* parent, int x, int y,
     QRectF rect(0.0, 0.0, w, h);
     QGraphicsRectItem* item = new ARegion(parent);
 
+    item->setData(ID_SERIAL, ++_serialNo);
     item->setRect(rect);
     item->setPen(QPen(Qt::NoPen));
     item->setBrush(QColor(255, 20, 20));

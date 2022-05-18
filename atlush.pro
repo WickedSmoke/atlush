@@ -8,7 +8,7 @@ RESOURCES = icons.qrc
 INCLUDEPATH = support
 
 HEADERS = AWindow.h ItemValues.h CanvasDialog.h ExtractDialog.h \
-	IOWidget.h support/RecentFiles.h
+	IOWidget.h support/RecentFiles.h support/undo.h
 
 SOURCES = AWindow.cpp packImages.cpp CanvasDialog.cpp ExtractDialog.cpp \
-	IOWidget.cpp support/RecentFiles.cpp
+	IOWidget.cpp support/RecentFiles.cpp support/undo.c

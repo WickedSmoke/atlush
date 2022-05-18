@@ -12,7 +12,8 @@
 
 // QGraphicsItem::data() key.
 enum ItemDataKey {
-    ID_NAME
+    ID_NAME,
+    ID_SERIAL
 };
 
 struct ItemValues {

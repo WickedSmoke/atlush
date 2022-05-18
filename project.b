@@ -8,6 +8,7 @@ exe %atlush [
         %ExtractDialog.cpp
         %IOWidget.cpp
         %support/RecentFiles.cpp
+        %support/undo.c
         %icons.qrc
     ]
 ]
