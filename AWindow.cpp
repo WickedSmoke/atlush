@@ -31,7 +31,8 @@
 #define ITEM_PIXMAP(gi) static_cast<const QGraphicsPixmapItem*>(gi)->pixmap()
 
 enum UndoOpcodes {
-    UNDO_POS = 1
+    UNDO_POS = 1,
+    UNDO_RECT
 };
 
 #define EXT_COUNT   4
@@ -268,7 +269,8 @@ class AView : public QGraphicsView
 {
 public:
     AView(QGraphicsScene* scene, UndoStack* undo, QAction* undoAct)
-        : QGraphicsView(scene), _undoStack(undo), _undoAct(undoAct)
+        : QGraphicsView(scene),
+        _undoRegion(NULL), _undoStack(undo), _undoAct(undoAct)
     {
         setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     }
@@ -292,6 +294,8 @@ private:
     void undoRecord(int, int);
 
     QPoint _panStart;
+    QRectF _undoRect;
+    ARegion* _undoRegion;
     std::vector<ItemShapshot> _undoSnap;
     std::vector<UndoValue> _undoValues;
     UndoStack* _undoStack;
@@ -345,10 +349,25 @@ void AView::mousePressEvent(QMouseEvent* ev)
 
         // Snapshot items for undo.
         if (ev->button() == Qt::LeftButton) {
-            _undoSnap.clear();
             ItemList sel = scene()->selectedItems();
-            for(int i = 0; i < sel.size(); ++i)
-                _undoSnap.emplace_back(sel.at(i));
+            int scount = sel.size();
+
+            _undoRegion = NULL;
+
+            if (scount == 1) {
+                QGraphicsItem* gi = sel[0];
+                if (IS_REGION(gi)) {
+                    _undoRegion = static_cast<ARegion*>(gi);
+                    _undoRect = _undoRegion->rect();
+                    _undoRect.moveTo( _undoRegion->pos() );
+                }
+            }
+
+            if (! _undoRegion) {
+                _undoSnap.clear();
+                for(int i = 0; i < scount; ++i)
+                    _undoSnap.emplace_back(sel.at(i));
+            }
         }
     }
 }
@@ -358,26 +377,54 @@ void AView::mouseReleaseEvent(QMouseEvent* ev)
     QGraphicsView::mouseReleaseEvent(ev);
 
     // Record any item changes.
-    if (ev->button() == Qt::LeftButton && ! _undoSnap.empty()) {
+    if (ev->button() == Qt::LeftButton) {
         UndoValue uval;
 
         // TODO: Handle deletion of items during drag.
         //       (or forbid it during drag)
 
-        //printf("KR snap %ld\n", _undoSnap.size());
-        for (const auto& it : _undoSnap) {
-            if (it.item->x() != it.x || it.item->y() != it.y) {
-                uval.u = it.item->data(ID_SERIAL).toUInt();
-                _undoValues.push_back(uval);
-                //printf("KR   mod %d %d\n", uval.u, it.item->type());
+        if (_undoRegion)
+        {
+            UndoValue sval;
+            QRectF cr = _undoRegion->rect();
 
-                uval.s[0] = int16_t(it.item->x() - it.x);
-                uval.s[1] = int16_t(it.item->y() - it.y);
-                _undoValues.push_back(uval);
+            uval.u = _undoRegion->data(ID_SERIAL).toUInt();
+            _undoValues.push_back(uval);
+
+            uval.s[0] = int16_t(_undoRegion->x() - _undoRect.x());
+            uval.s[1] = int16_t(_undoRegion->y() - _undoRect.y());
+            _undoValues.push_back(uval);
+
+            sval.s[0] = int16_t(cr.width() - _undoRect.width());
+            sval.s[1] = int16_t(cr.height() - _undoRect.height());
+            if (sval.s[0] || sval.s[1]) {
+                _undoValues.push_back(sval);
+                undoRecord(UNDO_RECT, 3);
+            } else if (uval.s[0] || uval.s[1]) {
+                undoRecord(UNDO_POS, 2);
+            } else {
+                _undoValues.clear();
             }
-        }
 
-        undoRecord(UNDO_POS, 2);
+            _undoRegion = NULL;
+        }
+        else if (! _undoSnap.empty())
+        {
+            //printf("KR snap %ld\n", _undoSnap.size());
+            for (const auto& it : _undoSnap) {
+                if (it.item->x() != it.x || it.item->y() != it.y) {
+                    uval.u = it.item->data(ID_SERIAL).toUInt();
+                    _undoValues.push_back(uval);
+                    //printf("KR   mod %d %d\n", uval.u, it.item->type());
+
+                    uval.s[0] = int16_t(it.item->x() - it.x);
+                    uval.s[1] = int16_t(it.item->y() - it.y);
+                    _undoValues.push_back(uval);
+                }
+            }
+
+            undoRecord(UNDO_POS, 2);
+        }
     }
 }
 
@@ -1334,6 +1381,33 @@ static void undoPosition(QGraphicsScene* scene, const UndoValue* step,
     }
 }
 
+static void undoRect(QGraphicsScene* scene, const UndoValue* step,
+                     const UndoValue* end, bool redo)
+{
+    QList<QGraphicsItem *> list = scene->items();
+
+    for (; step != end; step += 3) {
+        for (auto it : list) {
+            if (it->data(ID_SERIAL).toUInt() == step->u) {
+                QPointF dpos(float(step[1].s[0]), float(step[1].s[1]));
+                QPointF ddim(float(step[2].s[0]), float(step[2].s[1]));
+                if (! redo) {
+                    dpos *= -1.0f;
+                    ddim *= -1.0f;
+                }
+
+                ARegion* region = static_cast<ARegion*>(it);
+                QPointF pos = region->pos();
+                QRectF rect = region->rect();
+                region->setPos(pos + dpos);
+                region->setRect(0.0f, 0.0f, rect.width() + ddim.x(),
+                                            rect.height() + ddim.y());
+                break;
+            }
+        }
+    }
+}
+
 void AWindow::undo()
 {
     const UndoValue* step;
@@ -1348,6 +1422,9 @@ void AWindow::undo()
     switch (step->op.code) {
         case UNDO_POS:
             undoPosition(_scene, step + 1, step + step->op.skipNext, false);
+            break;
+        case UNDO_RECT:
+            undoRect(_scene, step + 1, step + step->op.skipNext, false);
             break;
     }
 }
@@ -1366,6 +1443,9 @@ void AWindow::redo()
     switch (step->op.code) {
         case UNDO_POS:
             undoPosition(_scene, step + 1, step + step->op.skipNext, true);
+            break;
+        case UNDO_RECT:
+            undoRect(_scene, step + 1, step + step->op.skipNext, true);
             break;
     }
 }
