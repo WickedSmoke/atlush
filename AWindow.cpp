@@ -289,12 +289,35 @@ protected:
     void wheelEvent(QWheelEvent*);
 
 private:
+    void undoRecord(int, int);
+
     QPoint _panStart;
     std::vector<ItemShapshot> _undoSnap;
     std::vector<UndoValue> _undoValues;
     UndoStack* _undoStack;
     QAction* _undoAct;
 };
+
+void AView::undoRecord(int opcode, int stride)
+{
+    if (! _undoValues.empty()) {
+        int len = _undoValues.size();
+        int partSize = (UNDO_VAL_LIMIT / stride) * stride;
+
+        // Break large change sets into smaller steps.
+        while (len > partSize) {
+            len -= partSize;
+            undo_record(_undoStack, opcode, _undoValues.data() + len, partSize);
+        }
+
+        if (len)
+            undo_record(_undoStack, opcode, _undoValues.data(), len);
+
+        _undoValues.clear();
+        _undoAct->setEnabled(true);
+        //emit undoStackChanged(_undoStack->used);
+    }
+}
 
 void AView::mousePressEvent(QMouseEvent* ev)
 {
@@ -354,15 +377,7 @@ void AView::mouseReleaseEvent(QMouseEvent* ev)
             }
         }
 
-        if (! _undoValues.empty()) {
-            size_t len = _undoValues.size();
-            if (len < 255)
-                undo_record(_undoStack, UNDO_POS, _undoValues.data(), len);
-            _undoValues.clear();
-
-            _undoAct->setEnabled(true);
-            //emit undoStackChanged(_undoStack->used);
-        }
+        undoRecord(UNDO_POS, 2);
     }
 }
 

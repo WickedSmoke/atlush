@@ -42,6 +42,7 @@ enum UndoResult {
 };
 
 #define Undo_Term   0
+#define UNDO_VAL_LIMIT  254
 
 #ifdef __cplusplus
 extern "C" {

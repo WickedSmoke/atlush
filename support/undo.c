@@ -59,6 +59,38 @@ void undo_clear(UndoStack* us)
     us->stack[0].u = Undo_Term;
 }
 
+static void undo_discardHistory(UndoStack* us)
+{
+    const UndoValue* ep = us->stack;
+    const size_t eraseLimit = 1024*8;
+    size_t total, stepLen;
+    size_t eraseLen = us->byteLimit / 4;
+
+    if (eraseLen > eraseLimit)
+        eraseLen = eraseLimit;
+    eraseLen /= UV_SIZE;
+
+    // Walk steps until eraseLen is reached.
+    total = 0;
+    while (total < eraseLen) {
+        stepLen = ep->op.skipNext;
+        ep += stepLen;
+        total += stepLen;
+    }
+
+    // TODO: Allow user to process removed steps.
+    // us->eraseCallback(us->stack, total, us->user);
+    // An alternative to a callback is to abort undo_record() and have the
+    // user call an undo_erase() function.
+
+    us->used -= total;
+    memcpy(us->stack, ep, us->used * UV_SIZE);
+    if (us->pos <= total)
+        us->pos = 0;
+    else
+        us->pos -= total;
+}
+
 /*
  * Add a new step to the undo history.
  *
@@ -80,14 +112,12 @@ void undo_record(UndoStack* us, uint16_t opcode, const UndoValue* data,
 
     // Adding one for the Undo_Term.
     if ((us->used + stepLen + 1) > us->avail) {
-#if 0
-        bytes = us->avail * UV_SIZE * 2;
-        if (bytes > us->byteLimit)
-            discardHistory(us);     // TODO
-#else
         size_t count = us->avail * 2;
         size_t bytes = (count * UV_SIZE) + UV_SIZE;
-#endif
+
+        if (bytes > us->byteLimit)
+            undo_discardHistory(us);    // Assuming at least bytes remain.
+
         us->stack = (UndoValue*) realloc(us->stack, bytes);
         us->avail = count;
     }
