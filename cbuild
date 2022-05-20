@@ -1,33 +1,51 @@
 #!/usr/bin/bash
-# Run "copr -a" to build project.tar.gz.
+# Container build script for atlush.
+
+if [ ! -s project.tar.gz ]; then
+	copr -a
+fi
 
 TIME=$(date +%H%M%S)
 SCRIPT=build-$TIME
 ID=${SCRIPT}
 HDIR=/tmp
 CDIR=/tmp
+ARC_DIR=/tmp/atlush-0.1
 
-if [ "$1" == "win" ]; then
+clean_dir () {
+	if [ -d "$1" ]; then rm -rf "$1"/*; else mkdir -p "$1"; fi
+}
+
+container_build () {
+	clean_dir ${ARC_DIR}
+
+	podman run -d -it --name=$ID $1 /bin/bash || exit
+	podman cp project.tar.gz $ID:$CDIR
+	podman cp $HDIR/${SCRIPT} $ID:$CDIR/${SCRIPT}
+	podman exec -it $ID /bin/bash $CDIR/${SCRIPT}
+}
+
+case $1 in
+windows)
 	echo '
-  mkdir ~/.cache
   mkdir atlush
   cd atlush
   tar xf /tmp/project.tar.gz
   copr -t mingw
 ' >$HDIR/${SCRIPT}
 
-	podman run -d -it --name=$ID dev/f33-mingw:1.2 /bin/bash || exit
-	podman cp project.tar.gz $ID:$CDIR
-	podman cp $HDIR/${SCRIPT} $ID:$CDIR/${SCRIPT}
-	podman exec -it -u build $ID /bin/bash $CDIR/${SCRIPT}
-	podman cp $ID:/home/build/atlush/atlush.exe /tmp/atlush.exe-$TIME
+	container_build dev/f35-mingw
+	podman cp $ID:/home/build/atlush/atlush.exe ${ARC_DIR}
 
 	# Build zip archive.
-	FN=`readlink -f arc/mingw-qt_app.tar.gz`
-	tar xf $FN -C /tmp
-	cp /tmp/atlush.exe-$TIME /tmp/qt_app/atlush.exe
-	cd /tmp; mv qt_app atlush; zip -r atlush.zip atlush
-else
+	if [ "$2" != "-b" ]; then
+		FN=`readlink -f arc/mingw-qt_app.tar.gz`
+		tar xf $FN -C ${ARC_DIR} --strip-components=1
+		cd ${ARC_DIR%/*}; zip -r atlush-0.1.zip ${ARC_DIR##*/}
+	fi
+	;;
+
+linux)
 	echo '
   mkdir atlush
   cd atlush
@@ -35,12 +53,16 @@ else
   copr
 ' >$HDIR/${SCRIPT}
 
-	podman run -d -it --name=$ID dev/centos8:1.0 /bin/bash || exit
-	podman cp project.tar.gz $ID:$CDIR
-	podman cp $HDIR/${SCRIPT} $ID:$CDIR/${SCRIPT}
-	podman exec -it $ID /bin/bash $CDIR/${SCRIPT}
-	podman cp $ID:/home/build/atlush/atlush /tmp/atlush-$TIME
-fi
+	container_build dev/centos8:1.0
+	podman cp $ID:/home/build/atlush/atlush ${ARC_DIR}
+	;;
+
+*)
+	echo "Usage: $0 {linux|windows} [-b]"
+	echo -e '\nOptions:'
+	echo '  -b    Build binary only; do not create archive.'
+	exit 1
+esac
 
 echo "$SCRIPT done!"
 podman stop $ID
