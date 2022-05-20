@@ -50,17 +50,24 @@ void AWindow::packImages()
     if (list.empty())
         list = _scene->items(Qt::AscendingOrder);
 
-    for(const QGraphicsItem* gi : list) {
-        if (gi->type() != GIT_PIXMAP)
+    QList<QGraphicsItem *>::iterator it = list.begin();
+    while (it != list.end()) {
+        QGraphicsItem* gi = *it;
+        if (gi->type() != GIT_PIXMAP) {
+            it = list.erase(it);        // Eliminate for snapshot.
             continue;
-        itemValues(val, gi);
+        }
 
+        itemValues(val, gi);
         val.w += pad;
         val.h += pad;
 
-        pk.input += Content<APData>((QGraphicsItem*) gi,
-                                Coord(val.x, val.y), Size(val.w, val.h), false);
+        pk.input += Content<APData>(gi, Coord(val.x, val.y),
+                                    Size(val.w, val.h), false);
+        ++it;
     }
+
+    _undo.snapshot(list);
     }
 
     // Pack 'em.
@@ -79,6 +86,8 @@ void AWindow::packImages()
         const Content<APData>& con = *it;
         con.content->setPos(con.coord.x, con.coord.y);
     }
+
+    _undo.commit();
 
     if (leftover)
         warnIncomplete(this, leftover);

@@ -253,24 +253,115 @@ private:
 
 //----------------------------------------------------------------------------
 
-struct ItemShapshot
+AUndoSystem::ItemShapshot::ItemShapshot(QGraphicsItem* gi) {
+    item = gi;
+    x = gi->x();
+    y = gi->y();
+}
+
+void AUndoSystem::undoRecord(int opcode, int stride)
 {
-    ItemShapshot(QGraphicsItem* gi) {
-        item = gi;
-        x = gi->x();
-        y = gi->y();
+    if (! values.empty()) {
+        int len = values.size();
+        int partSize = (UNDO_VAL_LIMIT / stride) * stride;
+
+        // Break large change sets into smaller steps.
+        while (len > partSize) {
+            len -= partSize;
+            undo_record(&stack, opcode, values.data() + len, partSize);
+        }
+
+        if (len)
+            undo_record(&stack, opcode, values.data(), len);
+
+        values.clear();
+        act->setEnabled(true);
+        //emit undoStackChanged(stack.used);
+    }
+}
+
+void AUndoSystem::snapshot(const QList<QGraphicsItem*>& items)
+{
+    assert(snap.empty());
+
+    int scount = items.size();
+    if (scount == 1) {
+        QGraphicsItem* gi = items[0];
+        if (IS_REGION(gi)) {
+            region = static_cast<ARegion*>(gi);
+            regionRect = region->rect();
+            regionRect.moveTo( region->pos() );
+            return;
+        }
     }
 
-    QGraphicsItem* item;
-    float x, y;
-};
+    region = NULL;
+    for(int i = 0; i < scount; ++i)
+        snap.emplace_back(items.at(i));
+}
+
+/*
+ * Commit changes since last snapshot() call to the undo stack.
+ *
+ * Deletion of items between snapshot & commit is not handled.  It is assumed
+ * that snapshotInProgress() is being used to prevent this.
+ */
+void AUndoSystem::commit()
+{
+    UndoValue uval;
+
+    if (region)
+    {
+        UndoValue sval;
+        QRectF cr = region->rect();
+
+        uval.u = region->data(ID_SERIAL).toUInt();
+        values.push_back(uval);
+
+        uval.s[0] = int16_t(region->x() - regionRect.x());
+        uval.s[1] = int16_t(region->y() - regionRect.y());
+        values.push_back(uval);
+
+        sval.s[0] = int16_t(cr.width() - regionRect.width());
+        sval.s[1] = int16_t(cr.height() - regionRect.height());
+        if (sval.s[0] || sval.s[1]) {
+            values.push_back(sval);
+            undoRecord(UNDO_RECT, 3);
+        } else if (uval.s[0] || uval.s[1]) {
+            undoRecord(UNDO_POS, 2);
+        } else {
+            values.clear();
+        }
+
+        region = NULL;
+    }
+    else if (! snap.empty())
+    {
+        //printf("KR snap %ld\n", snap.size());
+        for (const auto& it : snap) {
+            if (it.item->x() != it.x || it.item->y() != it.y) {
+                uval.u = it.item->data(ID_SERIAL).toUInt();
+                values.push_back(uval);
+                //printf("KR   mod %d %d\n", uval.u, it.item->type());
+
+                uval.s[0] = int16_t(it.item->x() - it.x);
+                uval.s[1] = int16_t(it.item->y() - it.y);
+                values.push_back(uval);
+            }
+        }
+
+        undoRecord(UNDO_POS, 2);
+        snap.clear();
+    }
+}
+
+//----------------------------------------------------------------------------
 
 class AView : public QGraphicsView
 {
 public:
-    AView(QGraphicsScene* scene, UndoStack* undo, QAction* undoAct)
-        : QGraphicsView(scene),
-        _undoRegion(NULL), _undoStack(undo), _undoAct(undoAct)
+    AView(QGraphicsScene* scene, AUndoSystem* undoSys)
+        : QGraphicsView(scene), _undo(undoSys)
     {
         setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     }
@@ -291,37 +382,9 @@ protected:
     void wheelEvent(QWheelEvent*);
 
 private:
-    void undoRecord(int, int);
-
     QPoint _panStart;
-    QRectF _undoRect;
-    ARegion* _undoRegion;
-    std::vector<ItemShapshot> _undoSnap;
-    std::vector<UndoValue> _undoValues;
-    UndoStack* _undoStack;
-    QAction* _undoAct;
+    AUndoSystem* _undo;
 };
-
-void AView::undoRecord(int opcode, int stride)
-{
-    if (! _undoValues.empty()) {
-        int len = _undoValues.size();
-        int partSize = (UNDO_VAL_LIMIT / stride) * stride;
-
-        // Break large change sets into smaller steps.
-        while (len > partSize) {
-            len -= partSize;
-            undo_record(_undoStack, opcode, _undoValues.data() + len, partSize);
-        }
-
-        if (len)
-            undo_record(_undoStack, opcode, _undoValues.data(), len);
-
-        _undoValues.clear();
-        _undoAct->setEnabled(true);
-        //emit undoStackChanged(_undoStack->used);
-    }
-}
 
 void AView::mousePressEvent(QMouseEvent* ev)
 {
@@ -350,24 +413,7 @@ void AView::mousePressEvent(QMouseEvent* ev)
         // Snapshot items for undo.
         if (ev->button() == Qt::LeftButton) {
             ItemList sel = scene()->selectedItems();
-            int scount = sel.size();
-
-            _undoRegion = NULL;
-
-            if (scount == 1) {
-                QGraphicsItem* gi = sel[0];
-                if (IS_REGION(gi)) {
-                    _undoRegion = static_cast<ARegion*>(gi);
-                    _undoRect = _undoRegion->rect();
-                    _undoRect.moveTo( _undoRegion->pos() );
-                }
-            }
-
-            if (! _undoRegion) {
-                _undoSnap.clear();
-                for(int i = 0; i < scount; ++i)
-                    _undoSnap.emplace_back(sel.at(i));
-            }
+            _undo->snapshot(sel);
         }
     }
 }
@@ -377,55 +423,8 @@ void AView::mouseReleaseEvent(QMouseEvent* ev)
     QGraphicsView::mouseReleaseEvent(ev);
 
     // Record any item changes.
-    if (ev->button() == Qt::LeftButton) {
-        UndoValue uval;
-
-        // TODO: Handle deletion of items during drag.
-        //       (or forbid it during drag)
-
-        if (_undoRegion)
-        {
-            UndoValue sval;
-            QRectF cr = _undoRegion->rect();
-
-            uval.u = _undoRegion->data(ID_SERIAL).toUInt();
-            _undoValues.push_back(uval);
-
-            uval.s[0] = int16_t(_undoRegion->x() - _undoRect.x());
-            uval.s[1] = int16_t(_undoRegion->y() - _undoRect.y());
-            _undoValues.push_back(uval);
-
-            sval.s[0] = int16_t(cr.width() - _undoRect.width());
-            sval.s[1] = int16_t(cr.height() - _undoRect.height());
-            if (sval.s[0] || sval.s[1]) {
-                _undoValues.push_back(sval);
-                undoRecord(UNDO_RECT, 3);
-            } else if (uval.s[0] || uval.s[1]) {
-                undoRecord(UNDO_POS, 2);
-            } else {
-                _undoValues.clear();
-            }
-
-            _undoRegion = NULL;
-        }
-        else if (! _undoSnap.empty())
-        {
-            //printf("KR snap %ld\n", _undoSnap.size());
-            for (const auto& it : _undoSnap) {
-                if (it.item->x() != it.x || it.item->y() != it.y) {
-                    uval.u = it.item->data(ID_SERIAL).toUInt();
-                    _undoValues.push_back(uval);
-                    //printf("KR   mod %d %d\n", uval.u, it.item->type());
-
-                    uval.s[0] = int16_t(it.item->x() - it.x);
-                    uval.s[1] = int16_t(it.item->y() - it.y);
-                    _undoValues.push_back(uval);
-                }
-            }
-
-            undoRecord(UNDO_POS, 2);
-        }
-    }
+    if (ev->button() == Qt::LeftButton)
+        _undo->commit();
 }
 
 void AView::mouseMoveEvent(QMouseEvent* event)
@@ -458,7 +457,6 @@ void AView::wheelEvent(QWheelEvent* event)
 AWindow::AWindow()
     : _modifiedStr(NULL), _canvasDialog(NULL), _ioDialog(NULL), _selItem(NULL)
 {
-    undo_init(&_undo, 1024*16);
     _serialNo = 0;
     setWindowTitle(APP_NAME);
 
@@ -466,11 +464,14 @@ AWindow::AWindow()
     createMenus();
     createTools();
 
+    undo_init(&_undo.stack, 1024*16);
+    _undo.act = _actUndo;
+
     _scene = new QGraphicsScene;
     connect(_scene, SIGNAL(selectionChanged()), SLOT(syncSelection()));
     connect(_scene, SIGNAL(changed(const QList<QRectF>&)), SLOT(sceneChange()));
 
-    _view = new AView(_scene, &_undo, _actUndo);
+    _view = new AView(_scene, &_undo);
     _view->setMinimumSize(128, 128);
     _view->setBackgroundBrush(QBrush(Qt::darkGray));
     _view->setDragMode(QGraphicsView::RubberBandDrag);
@@ -493,7 +494,7 @@ AWindow::AWindow()
 
 AWindow::~AWindow()
 {
-    undo_free(&_undo);
+    undo_free(&_undo.stack);
 }
 
 void AWindow::closeEvent( QCloseEvent* ev )
@@ -1322,6 +1323,9 @@ void AWindow::addRegion()
 
 void AWindow::removeSelected()
 {
+    if (_undo.snapshotInProgress())
+        return;
+
     ItemList sel = _scene->selectedItems();
     if (sel.size() == 1) {
         _scene->removeItem(sel[0]);
@@ -1352,7 +1356,7 @@ void AWindow::removeSelected()
 
 void AWindow::undoClear()
 {
-    undo_clear(&_undo);
+    undo_clear(&_undo.stack);
     _actUndo->setEnabled(false);
     _actRedo->setEnabled(false);
 }
@@ -1411,7 +1415,7 @@ static void undoRect(QGraphicsScene* scene, const UndoValue* step,
 void AWindow::undo()
 {
     const UndoValue* step;
-    int adv = undo_stepBack(&_undo, &step);
+    int adv = undo_stepBack(&_undo.stack, &step);
     if (adv & Undo_AdvancedToEnd)
         _actUndo->setEnabled(false);
     if (adv & Undo_AdvancedFromStart)
@@ -1432,7 +1436,7 @@ void AWindow::undo()
 void AWindow::redo()
 {
     const UndoValue* step;
-    int adv = undo_stepForward(&_undo, &step);
+    int adv = undo_stepForward(&_undo.stack, &step);
     if (adv & Undo_AdvancedToEnd)
         _actRedo->setEnabled(false);
     if (adv & Undo_AdvancedFromStart)

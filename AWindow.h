@@ -13,6 +13,37 @@
 #include "undo.h"
 
 
+class ARegion;
+
+struct AUndoSystem
+{
+    AUndoSystem() : region(NULL) {}
+    void snapshot(const QList<QGraphicsItem*>& items);
+    void commit();
+    bool snapshotInProgress() const {
+        return region || ! snap.empty();
+    }
+
+    struct ItemShapshot
+    {
+        ItemShapshot(QGraphicsItem* gi);
+
+        QGraphicsItem* item;
+        float x, y;
+    };
+
+    UndoStack stack;
+    QRectF regionRect;
+    ARegion* region;
+    std::vector<ItemShapshot> snap;
+    std::vector<UndoValue> values;
+    QAction* act;
+
+private:
+    void undoRecord(int opcode, int stride);
+};
+
+
 class QCheckBox;
 class QLineEdit;
 class QSpinBox;
@@ -154,7 +185,7 @@ private:
     QGraphicsItem* _selItem;
     QPixmap        _bgPix;
     QSize          _docSize;
-    UndoStack      _undo;
+    AUndoSystem    _undo;
     uint32_t       _serialNo;
 
     // Settings
