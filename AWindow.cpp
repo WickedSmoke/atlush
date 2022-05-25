@@ -7,7 +7,7 @@
 
 #include <math.h>
 #include <QApplication>
-#include <QCheckBox>
+#include <QComboBox>
 #include <QFileDialog>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsSceneMouseEvent>
@@ -787,14 +787,18 @@ void AWindow::createTools()
     _packPad = new QSpinBox;
     _packPad->setRange(0,32);
 
-    _packSort = new QCheckBox("Sort");
+    _packAlgo = new QComboBox;
+    _packAlgo->addItem("BinPack");
+    _packAlgo->addItem("BinPack Sort");
+    _packAlgo->addItem("SkyLine");
+    _packAlgo->addItem("SkyLine BF");
 
     _packBar = new QToolBar;
     _packBar->setObjectName("packBar");
     _packBar->addAction(_actPack);
     _packBar->addWidget(new QLabel("Pad:"));
     _packBar->addWidget(_packPad);
-    _packBar->addWidget(_packSort);
+    _packBar->addWidget(_packAlgo);
     addToolBar(Qt::TopToolBarArea, _packBar);
 
 

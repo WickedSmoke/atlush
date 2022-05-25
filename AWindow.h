@@ -44,7 +44,7 @@ private:
 };
 
 
-class QCheckBox;
+class QComboBox;
 class QLineEdit;
 class QSpinBox;
 class IOWidget;
@@ -175,7 +175,7 @@ private:
 
     QToolBar* _packBar;
     QSpinBox* _packPad;
-    QCheckBox* _packSort;
+    QComboBox* _packAlgo;
 
     QToolBar*  _searchBar;
     QLineEdit* _search;
