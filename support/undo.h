@@ -35,10 +35,10 @@ typedef struct {
 UndoStack;
 
 enum UndoResult {
-    Undo_AtEnd,
-    Undo_Advanced,
-    Undo_AdvancedFromStart = 2,
-    Undo_AdvancedToEnd     = 4
+    Undo_AtEnd,                 // Already at start/end of recorded steps.
+    Undo_Advanced,              // History position was moved back/forward.
+    Undo_AdvancedFromStart = 2, // Position was moved away from start/end.
+    Undo_AdvancedToEnd     = 4  // No steps exist ahead/behind new position.
 };
 
 #define Undo_Term   0

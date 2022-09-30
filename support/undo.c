@@ -22,7 +22,7 @@
 
 #define UV_SIZE sizeof(UndoValue)
 
-/*
+/**
  * Initialize UndoStack structure.
  *
  * \param byteLimit     Maximum byte size of undo history.
@@ -91,7 +91,7 @@ static void undo_discardHistory(UndoStack* us)
         us->pos -= total;
 }
 
-/*
+/**
  * Add a new step to the undo history.
  *
  * The step is added at the current position.  Any history after the current
@@ -100,7 +100,7 @@ static void undo_discardHistory(UndoStack* us)
  * If the history size grows beyond the byteLimit specified with undo_init()
  * then some previous history will be discarded.
  *
- * \param opcode    User identifer of undo step. Zero (Unto_Term) is reserved.
+ * \param opcode    User identifer of undo step. Zero (Undo_Term) is reserved.
  * \param data      Data for undo step.
  * \param values    Number of data items.  Must be less than 255.
  */
@@ -135,6 +135,14 @@ void undo_record(UndoStack* us, uint16_t opcode, const UndoValue* data,
     top->op.skipPrev = stepLen;
 }
 
+/**
+ * Move back one step in undo history.
+ *
+ * \param step  The pointer to the previous step is written here.
+ *              If Undo_AtEnd is returned this value will be NULL.
+ *
+ * \return UndoResult mask.
+ */
 int undo_stepBack(UndoStack* us, const UndoValue** step)
 {
     UndoValue* top;
@@ -160,6 +168,14 @@ int undo_stepBack(UndoStack* us, const UndoValue** step)
     return adv;
 }
 
+/**
+ * Move forward one step in undo history.
+ *
+ * \param step  The pointer to the next step is written here.
+ *              If Undo_AtEnd is returned this value will be NULL.
+ *
+ * \return UndoResult mask.
+ */
 int undo_stepForward(UndoStack* us, const UndoValue** step)
 {
     UndoValue* top;
