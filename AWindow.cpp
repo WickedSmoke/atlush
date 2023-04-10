@@ -427,15 +427,23 @@ void AView::mouseReleaseEvent(QMouseEvent* ev)
         _undo->commit();
 }
 
+#if QT_VERSION >= 0x060000
+#define POS_X(ev)   int(ev->position().x())
+#define POS_Y(ev)   int(ev->position().y())
+#else
+#define POS_X(ev)   ev->x()
+#define POS_Y(ev)   ev->y()
+#endif
+
 void AView::mouseMoveEvent(QMouseEvent* event)
 {
     if (event->buttons() & Qt::MiddleButton) {
         QScrollBar* sb;
 
         sb = horizontalScrollBar();
-        sb->setValue(sb->value() - (event->x() - _panStart.x()));
+        sb->setValue(sb->value() - (POS_X(event) - _panStart.x()));
         sb = verticalScrollBar();
-        sb->setValue(sb->value() - (event->y() - _panStart.y()));
+        sb->setValue(sb->value() - (POS_Y(event) - _panStart.y()));
         _panStart = event->pos();
 
         event->accept();
@@ -671,6 +679,7 @@ void AWindow::lockImages(bool lock)
 
 void AWindow::createMenus()
 {
+    QAction* act;
     QMenuBar* bar = menuBar();
 
     QMenu* file = bar->addMenu( "&File" );
@@ -694,12 +703,12 @@ void AWindow::createMenus()
     edit->addAction( _actRemove );
     edit->addSeparator();
     edit->addAction( _actPack );
-    edit->addAction("Merge Images...", this, SLOT(mergeImages()),
-                    QKeySequence(Qt::CTRL + Qt::Key_M));
-    edit->addAction("Extract Regions...", this, SLOT(extractRegions()),
-                    QKeySequence(Qt::CTRL + Qt::Key_E));
-    edit->addAction("Regions to Images...", this, SLOT(convertToImage()),
-                    QKeySequence(Qt::CTRL + Qt::Key_I));
+    act = edit->addAction("Merge Images...", this, SLOT(mergeImages()));
+    act->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_M));
+    act = edit->addAction("Extract Regions...", this, SLOT(extractRegions()));
+    act->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+    act = edit->addAction("Regions to Images...", this, SLOT(convertToImage()));
+    act->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
     edit->addAction("Crop Images...", this, SLOT(cropImages()));
     edit->addSeparator();
     edit->addAction("Canvas &Size...", this, SLOT(editDocSize()));

@@ -44,10 +44,10 @@ void IOWidget::setSpec(const QString& spec)
 {
     _pipeline->clear();
 
-    QVector<QStringRef> list = spec.splitRef('\n');
+    QStringList list = spec.split('\n');
     int count = list.size() / SPEC_SIZE;
     for (int i = 0; i < count; ++i)
-        _pipeline->addItem(list[i * SPEC_SIZE].toString());
+        _pipeline->addItem(list[i * SPEC_SIZE]);
 
     setEnabled(_pipeline->count() > 0);
 }
@@ -170,7 +170,7 @@ void IODialog::removePipeline()
     int n = _pipeline->currentIndex();
     if (n >= 0) {
          QStringList::iterator it = _spec.begin() + (n * SPEC_SIZE);
-        _spec.erase(it, it + SPEC_SIZE);
+        _spec.erase(it, it + int(SPEC_SIZE));
 
         _pipeline->removeItem(n);
         if (_pipeline->count() == 0) {
@@ -206,21 +206,23 @@ void IODialog::cmdChanged()
 //----------------------------------------------------------------------------
 
 #include <stdlib.h>
-#include <QRegExp>
+#include <QRegularExpression>
 
 static QString expandEnv(const QString& cmd)
 {
     QString rep(cmd);
-    QRegExp env_var("\\$([A-Za-z0-9_]+)");
-    int i;
+    QRegularExpression env_var("\\$([A-Za-z0-9_]+)");
 
-    while ((i = env_var.indexIn(rep)) != -1) {
-        QByteArray value(qgetenv(env_var.cap(1).toLatin1().data()));
-        if (value.size() > 0) {
-            rep.remove(i, env_var.matchedLength());
-            rep.insert(i, value);
-        } else
+    for (;;) {
+        QRegularExpressionMatch em = env_var.match(rep);
+        if (! em.hasMatch())
             break;
+        QByteArray value(qgetenv(em.captured(1).toLatin1().data()));
+        if (value.size() < 1)
+            break;
+        int i = em.capturedStart();
+        rep.remove(i, em.capturedLength());
+        rep.insert(i, value);
     }
     return rep;
 }
@@ -232,7 +234,7 @@ static QString expandEnv(const QString& cmd)
  */
 int io_execute(const QString& spec, int pipeline, int push, QString& cmd)
 {
-    QVector<QStringRef> list = spec.splitRef('\n');
+    QStringList list = spec.split('\n');
     int count = list.size() / SPEC_SIZE;
     if (pipeline < 0 || pipeline >= count) {
         cmd = "<invalid pipeline>";
@@ -240,7 +242,7 @@ int io_execute(const QString& spec, int pipeline, int push, QString& cmd)
     }
 
     push = push ? SPEC_EXPORT : SPEC_IMPORT;
-    QString raw(list[pipeline * SPEC_SIZE + push].toString());
+    QString raw(list[pipeline * SPEC_SIZE + push]);
     if (raw.isEmpty()) {
         cmd = "<empty command>";
         return -1;
